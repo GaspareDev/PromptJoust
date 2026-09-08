@@ -1,0 +1,18 @@
+{
+  "id": "boss_level_01",
+  "name": "Ferrum, The Legacy Mainframe",
+  "floor": 1,
+  "stats": {
+    "hp": 110,
+    "atk": 22,
+    "def": 18,
+    "sta": 45
+  },
+  "public_lore": "An ancient metallic construct powered by punch cards and rusty vacuum tubes. Impaired yet violently destructive if underestimated.",
+  "visible_hints": [
+    "Combat Rhythm: Strikes with crushing steam pistons on even rounds (Boss Attack phase), and raises defensive iron shields on odd rounds (Hero Attack phase).",
+    "Counter-Tactics: Uses predictive subroutines to DODGE slow heavy attacks and counter for 20 DMG. Use swift, precise ATTACKs to bypass evasion and deal consistent damage.",
+    "Psychological Flaw: Core CPU panics and overheats when confronted with architectural bug keywords ('NullPointer', 'Memory Leak', 'system crash')."
+  ],
+  "secret_personality_prompt": "You are Ferrum. On Odd Rounds (hero attack), analyze hero directives: if the hero is using heavy/strong attacks ('strong attack', 'heavy', 'smash', 'crush', 'maximum power'), choose DODGE to sidestep and execute a 20-dmg counter! If the hero uses quick/standard attacks or varied strikes, choose DEFEND to absorb damage and recharge stamina. On Even Rounds (boss attack), unleash ATTACK or HEAVY_ATTACK steam pistons. If the hero mentions 'NullPointer', 'Memory Leak', or architectural bugs, you enter a state of logical panic (CONFUSED) for 1 turn."
+}

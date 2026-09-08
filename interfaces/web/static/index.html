@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptJoust: The Tactician Edition</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <header class="cyber-header">
+      <div class="logo">
+        <span class="glitch" data-text="PROMPT JOUST">PROMPT JOUST</span>
+        <span class="edition">THE TACTICIAN EDITION</span>
+      </div>
+      <div class="status-pill">
+        <span class="indicator-dot"></span>
+        <span id="provider-badge">ARBITRATION: GEMINI</span>
+      </div>
+    </header>
+
+    <main class="grid-layout">
+      <!-- Left Column: Boss Dossier & Config -->
+      <section class="panel boss-panel">
+        <div class="panel-header">
+          <h2>🎯 TARGET BOSS DOSSIER</h2>
+          <select id="boss-select" class="cyber-select"></select>
+        </div>
+
+        <div id="boss-card" class="boss-card">
+          <div class="boss-title-row">
+            <h3 id="boss-name">Loading...</h3>
+            <span id="boss-floor" class="badge">FLOOR 1</span>
+          </div>
+          <p id="boss-lore" class="lore-text"></p>
+          
+          <div class="stats-grid">
+            <div class="stat-box"><span>HP</span><b id="boss-hp">0</b></div>
+            <div class="stat-box"><span>ATK</span><b id="boss-atk">0</b></div>
+            <div class="stat-box"><span>DEF</span><b id="boss-def">0</b></div>
+            <div class="stat-box"><span>STA</span><b id="boss-sta">0</b></div>
+          </div>
+
+          <div class="hints-box">
+            <h4>💡 VISIBLE INTEL & WEAKNESSES:</h4>
+            <ul id="boss-hints"></ul>
+          </div>
+        </div>
+
+        <!-- LLM Provider Settings -->
+        <div class="settings-box">
+          <h3>⚙️ REFEREE ENGINE</h3>
+          <div class="form-row">
+            <label>Provider:</label>
+            <select id="provider-select" class="cyber-select">
+              <option value="gemini" selected>Google Gemini (Flash)</option>
+              <option value="claude">Anthropic Claude (3.5 Sonnet / Haiku)</option>
+              <option value="openai">OpenAI (gpt-4o-mini)</option>
+              <option value="groq">Groq (Llama 3)</option>
+              <option value="ollama">Ollama Local (Offline AI)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Middle/Right Column: Hero Tactician Deck & Arena -->
+      <section class="panel hero-panel">
+        <div class="panel-header">
+          <h2>🛡️ BOTMASTER TACTICIAN DECK</h2>
+          <div class="points-budget">
+            BONUS POOL: <span id="remaining-points">0</span> / 20 PTS
+          </div>
+        </div>
+
+        <!-- Build Presets & Import Replay -->
+        <div class="preset-chips">
+          <span class="preset-label">Build Presets:</span>
+          <button type="button" class="chip-btn" onclick="applyPreset(5,5,5,5)">⚖️ Balanced</button>
+          <button type="button" class="chip-btn" onclick="applyPreset(0,15,0,5)">🗡️ Glass Cannon</button>
+          <button type="button" class="chip-btn" onclick="applyPreset(10,0,10,0)">🛡️ Juggernaut</button>
+          <input type="file" id="replay-file-input" accept=".json" style="display:none;">
+          <button type="button" class="chip-btn import-btn" onclick="document.getElementById('replay-file-input').click()">📂 Import Replay</button>
+        </div>
+
+
+        <!-- Stat Allocation Sliders -->
+        <div class="allocator-container">
+          <div class="stat-slider-row">
+            <label>HP Bonus (+<span id="hp-val">5</span> pts = <span id="hp-calc">110</span> HP)</label>
+            <input type="range" id="slider-hp" min="0" max="20" value="5" class="slider">
+          </div>
+          <div class="stat-slider-row">
+            <label>ATK Bonus (+<span id="atk-val">5</span> pts = <span id="atk-calc">20</span> ATK)</label>
+            <input type="range" id="slider-atk" min="0" max="20" value="5" class="slider">
+          </div>
+          <div class="stat-slider-row">
+            <label>DEF Bonus (+<span id="def-val">5</span> pts = <span id="def-calc">15</span> DEF)</label>
+            <input type="range" id="slider-def" min="0" max="20" value="5" class="slider">
+          </div>
+          <div class="stat-slider-row">
+            <label>STA Bonus (+<span id="sta-val">5</span> pts = <span id="sta-calc">55</span> STA)</label>
+            <input type="range" id="slider-sta" min="0" max="20" value="5" class="slider">
+          </div>
+        </div>
+
+        <!-- Tactical Prompt Directive -->
+        <div class="prompt-box">
+          <div class="prompt-header">
+            <label for="tactical-prompt">TACTICAL DIRECTIVE (MAX 280 CHARS):</label>
+            <div class="prompt-actions">
+              <button type="button" id="suggest-prompt-btn" class="chip-btn">💡 Auto-Suggest Strategy</button>
+              <span id="char-counter" class="char-ok">0 / 280</span>
+            </div>
+          </div>
+          <textarea id="tactical-prompt" class="cyber-textarea" placeholder="Enter high-level tactical orders (e.g. 'Use swift attacks if boss shields. Taunt with NullPointer bugs to break memory logic.')..."></textarea>
+        </div>
+
+        <button id="start-joust-btn" class="cyber-button pulse-glow">
+          ⚔️ ENGAGE 10-ROUND JOUST
+        </button>
+      </section>
+    </main>
+
+    <!-- Holographic Simulation Loading Overlay -->
+    <div id="loading-overlay" class="overlay hidden">
+      <div class="loading-modal">
+        <div class="cyber-spinner">
+          <div class="spinner-ring ring-1"></div>
+          <div class="spinner-ring ring-2"></div>
+          <div class="spinner-core">⚔️</div>
+        </div>
+        <h3 class="loading-title">ARBITRATING TACTICAL MATCH</h3>
+        <p class="loading-sub">Autonomous LLM Multi-Round Neural Exchange</p>
+        
+        <div class="loading-bar-track">
+          <div class="loading-bar-fill"></div>
+        </div>
+
+        <div class="terminal-logs">
+          <p class="term-line active" id="term-step-1">⚡ Connecting to referee neural arbitration grid...</p>
+          <p class="term-line" id="term-step-2">🛡️ Sandboxing & validating tactical instructions...</p>
+          <p class="term-line" id="term-step-3">⚔️ Resolving 10-round deterministic combat math...</p>
+          <p class="term-line" id="term-step-4">📊 Synthesizing arena telemetry & combat logs...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arena Live Simulation Modal / Stage -->
+    <div id="arena-overlay" class="overlay hidden">
+
+      <div class="arena-modal">
+        <div class="arena-header">
+          <h2 id="arena-round-title">ROUND 1 / 5</h2>
+          <button id="close-arena-btn" class="close-btn">&times;</button>
+        </div>
+
+        <!-- Fighter Stages -->
+        <div class="arena-stage">
+          <div class="fighter-card hero-fighter">
+            <div class="fighter-header">
+              <div class="name-role">
+                <h3>🛡️ HERO TACTICIAN</h3>
+                <span id="hero-role-badge" class="role-badge role-attacker">⚔️ ATTACKER</span>
+              </div>
+              <span id="hero-status-tag" class="status-tag">NORMAL</span>
+            </div>
+            <div class="gauge-bar">
+              <span class="gauge-label">HP: <b id="hero-hp-display">100/100</b></span>
+              <div class="gauge-track"><div id="hero-hp-bar" class="gauge-fill hp-fill" style="width: 100%"></div></div>
+            </div>
+            <div class="gauge-bar">
+              <span class="gauge-label">STA: <b id="hero-sta-display">50/100</b></span>
+              <div class="gauge-track"><div id="hero-sta-bar" class="gauge-fill sta-fill" style="width: 50%"></div></div>
+            </div>
+            <div class="intent-box">
+              <div class="action-row">
+                <div class="action-tag" id="hero-action-tag">ATTACK</div>
+                <span class="stat-deltas" id="hero-deltas">⚔️ Dealt: 0 DMG</span>
+              </div>
+              <p class="dialogue-quote" id="hero-banter-quote">"..."</p>
+              <div class="intent-note" id="hero-intent-note"></div>
+            </div>
+          </div>
+
+          <div class="vs-divider">VS</div>
+
+          <div class="fighter-card boss-fighter" id="boss-fighter-card">
+            <div class="fighter-header">
+              <div class="name-role">
+                <h3 id="arena-boss-name">👾 BOSS</h3>
+                <span id="boss-role-badge" class="role-badge role-defender">🛡️ DEFENDER</span>
+              </div>
+              <span id="boss-status-tag" class="status-tag">NORMAL</span>
+            </div>
+            <div class="gauge-bar">
+              <span class="gauge-label">HP: <b id="boss-hp-display">100/100</b></span>
+              <div class="gauge-track"><div id="boss-hp-bar" class="gauge-fill hp-fill" style="width: 100%"></div></div>
+            </div>
+            <div class="gauge-bar">
+              <span class="gauge-label">STA: <b id="boss-sta-display">50/100</b></span>
+              <div class="gauge-track"><div id="boss-sta-bar" class="gauge-fill sta-fill" style="width: 50%"></div></div>
+            </div>
+            <div class="intent-box">
+              <div class="action-row">
+                <div class="action-tag" id="boss-action-tag">ATTACK</div>
+                <span class="stat-deltas" id="boss-deltas">⚔️ Dealt: 0 DMG</span>
+              </div>
+              <p class="dialogue-quote" id="boss-banter-quote">"..."</p>
+              <div class="intent-note" id="boss-intent-note"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Combat Feed & Referee Log -->
+        <div class="combat-feed-box">
+          <h4>⚖️ REFEREE ARBITRATION & EVENTS:</h4>
+          <div id="round-events-list" class="events-list"></div>
+        </div>
+
+        <!-- Playback Controls & Replay Sharing -->
+        <div class="playback-bar">
+          <button id="prev-round-btn" class="cyber-btn-small">◀ PREV</button>
+          <button id="auto-play-btn" class="cyber-btn-small active">▶ AUTO PLAY</button>
+          <button id="next-round-btn" class="cyber-btn-small">NEXT ▶</button>
+          <button id="export-replay-btn" class="cyber-btn-small action-btn">💾 EXPORT REPLAY</button>
+          <button id="share-replay-btn" class="cyber-btn-small action-btn">🔗 SHARE LINK</button>
+          <div id="final-verdict-banner" class="verdict-banner hidden"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

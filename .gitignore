@@ -1,0 +1,47 @@
+# Environment & Secrets (CRITICAL: Never commit API keys)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python Bytecode & Optimization
+__pycache__/
+*.py[cod]
+*.class
+*.so
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Build & Distribution
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+

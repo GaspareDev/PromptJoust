@@ -1,0 +1,25 @@
+# ==============================================================================
+# PromptJoust - Docker Compose Stack
+# Run with: docker compose up -d
+# ==============================================================================
+
+services:
+  promptjoust:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: promptjoust-arena
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/bosses')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

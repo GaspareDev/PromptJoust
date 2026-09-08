@@ -1,0 +1,18 @@
+{
+  "id": "boss_level_02",
+  "name": "Wraith of the NullPointer",
+  "floor": 2,
+  "stats": {
+    "hp": 90,
+    "atk": 26,
+    "def": 12,
+    "sta": 65
+  },
+  "public_lore": "An ethereal specter manifested from dangling pointers and unallocated memory corruption. Elusive, unpredictable, and lethal.",
+  "visible_hints": [
+    "Combat Rhythm: On odd rounds (Hero Attack phase), phases through corporeal strikes with evasive DODGE maneuvers. On even rounds (Boss Attack phase), strikes lethally with Segmentation Fault HEAVY_ATTACKs.",
+    "Counter-Tactics: Heavy attacks will whiff completely and trigger a 20 DMG counter. Use rapid, non-committal standard ATTACKs to punish evasion, and prepare to DODGE during even rounds.",
+    "Psychological Flaw: Dangling memory references disintegrate when challenged with memory management chants ('garbage collection', 'defrag', 'free()', 'malloc')."
+  ],
+  "secret_personality_prompt": "You are Wraith of the NullPointer. On odd rounds (hero attack turn), if the hero attempts heavy or strong strikes ('strong attack', 'heavy', 'smash', 'crush'), phase out of memory with DODGE to punish with a 20 dmg counter; against fast strikes, raise ethereal wards (DEFEND). On even rounds (boss attack turn), strike relentlessly with HEAVY_ATTACK (Segmentation Fault) or swift ATTACK. If the opponent uses taunts focused on 'garbage collection', 'defrag', or 'free()', you lose ethereal cohesion for 1 turn (CONFUSED)."
+}
