@@ -1,6 +1,6 @@
 # ⚔️ PromptJoust: The Tactician Edition
 
-[![CI Test Suite](https://github.com/GaspareDev/PromptJoust/actions/workflows/test.yml/badge.svg)](https://github.com/GaspareDev/PromptJoust/actions)
+[![CI Test Suite](https://github.com/GaspareDev/PromptJoust/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/GaspareDev/PromptJoust/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![LLM: Structured Outputs](https://img.shields.io/badge/LLM-Structured%20Outputs-brightgreen.svg)]()
