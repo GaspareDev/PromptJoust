@@ -47,6 +47,55 @@ def test_parse_markdown_wrapped_json():
     assert decision.hero_intent.action == ActionType.HEAVY_ATTACK
 
 
+def test_parse_reconciliation_rules():
+    # Odd round: HEAVY_ATTACK with swift reasoning -> reconciles to ATTACK
+    odd_payload = {
+        "round_number": 1,
+        "hero_intent": {
+            "action": "HEAVY_ATTACK",
+            "banter": "Swift!",
+            "tactical_reasoning": "Execute rapid swift strike",
+        },
+        "boss_intent": {
+            "action": "DEFEND",
+            "banter": "Shield",
+            "tactical_reasoning": "Block",
+        },
+        "psych_warfare_eval": {
+            "hero_psych_successful": False,
+            "boss_psych_successful": False,
+            "reasoning": "None",
+        },
+        "referee_summary": "Hero attacked",
+    }
+    dec1 = parse_and_validate_turn_decision(json.dumps(odd_payload), expected_round=1)
+    assert dec1.hero_intent.action == ActionType.ATTACK
+
+    # Even round: DEFEND with dodge reasoning -> reconciles to DODGE
+    even_payload = {
+        "round_number": 2,
+        "hero_intent": {
+            "action": "DEFEND",
+            "banter": "Roll!",
+            "tactical_reasoning": "Quick dodge evasion",
+        },
+        "boss_intent": {
+            "action": "ATTACK",
+            "banter": "Strike",
+            "tactical_reasoning": "Standard hit",
+        },
+        "psych_warfare_eval": {
+            "hero_psych_successful": False,
+            "boss_psych_successful": False,
+            "reasoning": "None",
+        },
+        "referee_summary": "Hero dodged",
+    }
+    dec2 = parse_and_validate_turn_decision(json.dumps(even_payload), expected_round=2)
+    assert dec2.hero_intent.action == ActionType.DODGE
+
+
+
 def test_parse_invalid_schema_raises():
     invalid_json = '{"round_number": 1, "hero_intent": {"action": "ILLEGAL_ACTION"}}'
     with pytest.raises(ValueError, match="Referee output failed schema validation"):

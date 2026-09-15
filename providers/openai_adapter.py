@@ -55,6 +55,8 @@ class OpenAIProvider(BaseLLMProvider):
                 },
             },
             temperature=0.2,
+            max_tokens=250,
         )
+
         content = response.choices[0].message.content
         return content

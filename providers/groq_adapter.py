@@ -40,7 +40,8 @@ class GroqProvider(BaseLLMProvider):
         user_prompt: str,
         schema: Dict[str, Any],
     ) -> Union[str, TurnDecision]:
-        system_with_schema = f"{system_prompt}\n\nYou MUST respond strictly in valid JSON matching this schema:\n{json.dumps(schema)}"
+        compact_schema = json.dumps(schema, separators=(",", ":"))
+        system_with_schema = f"{system_prompt}\n\nYou MUST respond strictly in valid JSON matching this schema:\n{compact_schema}"
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -49,6 +50,8 @@ class GroqProvider(BaseLLMProvider):
             ],
             response_format={"type": "json_object"},
             temperature=0.2,
+            max_tokens=250,
         )
         content = response.choices[0].message.content
         return content
+

@@ -19,7 +19,7 @@ from .base import BaseLLMProvider
 class OllamaProvider(BaseLLMProvider):
     """
     Ollama adapter for 100% offline, zero-cost local LLM execution.
-    Default model: llama3 (or mistral, qwen2.5)
+    Default model: llama3.2 (or llama3, qwen2.5, mistral)
     """
 
     def __init__(self, host: Optional[str] = None, model: Optional[str] = None):
@@ -34,8 +34,14 @@ class OllamaProvider(BaseLLMProvider):
         schema: Dict[str, Any],
     ) -> Union[str, TurnDecision]:
         url = f"{self.host.rstrip('/')}/api/chat"
-        system_with_schema = f"{system_prompt}\n\nSTRICT REQUIREMENT: Output must strictly validate against this JSON Schema:\n{json.dumps(schema)}"
+        # Minified JSON schema representation to minimize token consumption
+        min_schema = json.dumps(schema, separators=(',', ':'))
+        system_with_schema = f"{system_prompt}\n\nSTRICT REQUIREMENT: Output must strictly validate against this JSON Schema:\n{min_schema}"
 
+        # Optimized performance parameters:
+        # - keep_alive: retains model in memory across rounds to avoid reload latency
+        # - num_predict: caps maximum generated tokens (~100 tokens needed for round JSON)
+        # - num_ctx: limits KV cache allocation to 1024 tokens for faster attention processing
         payload = {
             "model": self.model,
             "messages": [
@@ -44,13 +50,18 @@ class OllamaProvider(BaseLLMProvider):
             ],
             "format": "json",
             "stream": False,
+            "keep_alive": "15m",
             "options": {
-                "temperature": 0.2,
+                "temperature": 0.1,
+                "num_predict": 180,
+                "num_ctx": 1024,
+                "top_k": 20,
+                "top_p": 0.85,
             },
         }
 
         try:
-            resp = requests.post(url, json=payload, timeout=60)
+            resp = requests.post(url, json=payload, timeout=45)
             resp.raise_for_status()
             data = resp.json()
             return data["message"]["content"]
@@ -59,3 +70,4 @@ class OllamaProvider(BaseLLMProvider):
                 f"Failed to communicate with local Ollama server at {self.host}. "
                 f"Is Ollama running (`ollama serve`) and is '{self.model}' installed (`ollama pull {self.model}`)? Details: {exc}"
             ) from exc
+

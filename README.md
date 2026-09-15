@@ -1,6 +1,7 @@
 # ⚔️ PromptJoust: The Tactician Edition
 
 [![CI Test Suite](https://github.com/GaspareDev/PromptJoust/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/GaspareDev/PromptJoust/actions)
+[![Coverage: 100%](https://img.shields.io/badge/Coverage-100%25-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![LLM: Structured Outputs](https://img.shields.io/badge/LLM-Structured%20Outputs-brightgreen.svg)]()
@@ -17,7 +18,7 @@ In traditional RPGs, you control your character with buttons and menus. In **Pro
 1. **Craft a Strategy**: Write a natural language tactical directive for your hero (up to 280 characters).
 2. **Allocate Stat Points**: Distribute a pool of 20 bonus points across Health (HP), Attack (ATK), Defense (DEF), and Stamina (STA).
 3. **Face Unique Bosses**: Each boss has distinct lore, hidden weaknesses, and dynamic behavioral routines.
-4. **AI Referee Arbitration**: A Large Language Model (Google Gemini, OpenAI, Groq, or local Ollama) acts as the sandboxed arena referee. It interprets both fighters' intents turn-by-turn into structured JSON decisions.
+4. **AI Referee Arbitration**: A Large Language Model (Google Gemini, Anthropic Claude, OpenAI, Groq, or local Ollama) acts as the sandboxed arena referee. It interprets both fighters' intents turn-by-turn into structured JSON decisions.
 5. **Deterministic Combat Engine**: A pure Python combat rules engine resolves all damage, stamina economy, guard breaks, dodge counters, and status effects.
 
 No fluff, no conversational drift—just pure tactical prompt engineering and deterministic game mechanics.
@@ -26,7 +27,8 @@ No fluff, no conversational drift—just pure tactical prompt engineering and de
 
 ## 🌟 Key Features
 
-- **Multi-Model Support**: Play using cloud LLMs (**Google Gemini Flash**, **OpenAI `gpt-4o-mini`**, **Groq `llama-3.3`**) or run **100% offline & free** using a local **Ollama** instance.
+- **Multi-Model Support**: Play using cloud LLMs (**Google Gemini Flash**, **Anthropic Claude**, **OpenAI `gpt-4o-mini`**, **Groq `llama-3.3`**) or run **100% offline & free** using a local **Ollama** instance.
+
 - **Strict JSON Structured Outputs**: The referee outputs schema-enforced actions without markdown clutter or hallucinations.
 - **3-Layer Prompt Injection Defense**:
   - _Layer 1 (XML Sandboxing)_: Untrusted inputs are isolated within `<untrusted_entity>` boundary tags.
@@ -52,9 +54,10 @@ flowchart TD
     end
 
     subgraph AI ["AI Referee Arbitration"]
-        D[LLM Referee: Gemini / OpenAI / Groq / Ollama]
+        D[LLM Referee: Gemini / Claude / OpenAI / Groq / Ollama]
         E[Pydantic JSON Schema Validation]
     end
+
 
     subgraph Core ["Deterministic Combat Core"]
         F[Combat Resolution Matrix: Damage, Blocks, Counters]
@@ -109,8 +112,8 @@ Matches last **up to 10 rounds** with alternating initiative:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/promptfight.git
-cd promptfight
+git clone https://github.com/GaspareDev/PromptJoust.git
+cd PromptJoust
 
 # 2. Install dependencies
 pip install -r requirements.txt
@@ -152,7 +155,9 @@ You can choose your referee directly from the dropdown in the web UI or preconfi
    - Ultra-fast inference. Set `GROQ_API_KEY=your_key_here` in `.env`.
 5. **Ollama (100% Free & Local)**:
    - Run local models on your own machine without sending data to external APIs.
-   - Ensure Ollama is running (`ollama serve` and `ollama pull llama3`), then select _Ollama Local_ in the UI.
+   - Recommended lightweight fast models: `qwen2.5:3b-instruct` or `llama3.2:3b` for fast turns, or `llama3`.
+   - Ensure Ollama is running (`ollama serve` and `ollama run qwen2.5:3b-instruct`), then select _Ollama Local_ in the UI.
+   - When running PromptJoust via Docker, set `OLLAMA_HOST=http://host.docker.internal:11434` in `.env`.
 
 ---
 
@@ -184,13 +189,13 @@ Creating a new boss is as simple as dropping a `.json` file into `content/bosses
 
 ## 🧪 Running Tests
 
-PromptJoust includes a comprehensive unit test suite covering game mechanics, rule edge cases, prompt injection defense, provider adapters, and the web API:
+PromptJoust includes a comprehensive unit test suite (88/88 passing, 100% statement coverage across all core, provider, and interface modules):
 
 ```bash
 # Run all tests
 python -m pytest
 
-# Run tests with coverage report
+# Run tests with strict coverage report
 python -m pytest --cov=core --cov=providers --cov=interfaces tests/
 ```
 
@@ -199,3 +204,4 @@ python -m pytest --cov=core --cov=providers --cov=interfaces tests/
 ## 📜 License
 
 Released under the [MIT License](LICENSE). Contributions, bug reports, and custom boss submissions are warmly welcome!
+

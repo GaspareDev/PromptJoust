@@ -2,9 +2,9 @@ name: CI Test Suite
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
 
 jobs:
   test:
@@ -30,4 +30,5 @@ jobs:
 
       - name: Run test suite with pytest
         run: |
-          pytest --cov=core --cov=providers tests/
+          pytest --cov=core --cov=providers --cov=interfaces tests/
+

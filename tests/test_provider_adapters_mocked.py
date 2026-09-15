@@ -190,6 +190,67 @@ def test_claude_provider_rest_fallback_success():
             assert result == SAMPLE_DECISION_JSON
 
 
+def test_claude_provider_sdk_dict_content():
+    mock_anthropic = MagicMock()
+    mock_client = MagicMock()
+    mock_anthropic.Anthropic.return_value = mock_client
+    mock_resp = MagicMock()
+    # Dict content part instead of object with .text attribute
+    mock_resp.content = [{"text": SAMPLE_DECISION_JSON}]
+    mock_client.messages.create.return_value = mock_resp
+
+    with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+        provider = ClaudeProvider(api_key="fake-claude-key")
+        result = provider.generate_turn_decision(
+            system_prompt="sys",
+            user_prompt="usr",
+            schema=REFEREE_JSON_SCHEMA,
+        )
+        assert result == SAMPLE_DECISION_JSON
+
+
+def test_claude_provider_sdk_error_falls_back_to_rest():
+    mock_anthropic = MagicMock()
+    mock_client = MagicMock()
+    mock_anthropic.Anthropic.return_value = mock_client
+    mock_client.messages.create.side_effect = RuntimeError("Anthropic SDK connection lost")
+
+    with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "content": [{"text": SAMPLE_DECISION_JSON}]
+            }
+            mock_resp.raise_for_status.return_value = None
+            mock_post.return_value = mock_resp
+
+            provider = ClaudeProvider(api_key="fake-claude-key")
+            result = provider.generate_turn_decision(
+                system_prompt="sys",
+                user_prompt="usr",
+                schema=REFEREE_JSON_SCHEMA,
+            )
+            assert result == SAMPLE_DECISION_JSON
+
+
+def test_claude_provider_unexpected_response_structure():
+    with patch.dict("sys.modules", {"anthropic": None}):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {"content": []}
+            mock_resp.raise_for_status.return_value = None
+            mock_post.return_value = mock_resp
+
+            provider = ClaudeProvider(api_key="fake-claude-key")
+            with pytest.raises(ValueError, match="Unexpected response structure"):
+                provider.generate_turn_decision(
+                    system_prompt="sys",
+                    user_prompt="usr",
+                    schema=REFEREE_JSON_SCHEMA,
+                )
+
+
+
 def test_claude_provider_connection_error():
     import requests
     with patch.dict("sys.modules", {"anthropic": None}):

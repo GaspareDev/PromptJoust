@@ -23,7 +23,7 @@ def test_settings_defaults():
     assert s.claude_model == "claude-3-5-haiku-20241022"
     assert s.openai_model == "gpt-4o-mini"
     assert s.groq_model == "llama-3.3-70b-versatile"
-    assert s.ollama_model == "llama3"
+    assert s.ollama_model == "llama3.2"
     assert s.get_effective_gemini_key() is None
     assert s.get_effective_claude_key() is None
 
@@ -52,4 +52,25 @@ def test_load_env_file(tmp_path):
     assert os.getenv("TEST_CUSTOM_CONFIG_KEY") == "custom_value"
     # Calling on non-existent file should be a no-op
     _load_env_file(tmp_path / "non_existent.env")
+
+
+def test_load_env_file_ioerror():
+    from core.config import _load_env_file
+    from pathlib import Path
+    with patch("builtins.open", side_effect=IOError("Permission denied")):
+        _load_env_file(Path(".env"))
+
+
+def test_config_import_error_fallback():
+    import sys
+    import importlib
+    with patch.dict(sys.modules, {"pydantic_settings": None}):
+        import core.config
+        importlib.reload(core.config)
+        s = core.config.Settings()
+        assert s.ollama_model == "llama3.2"
+        assert s.get_effective_gemini_key() is None
+        assert s.get_effective_claude_key() is None
+    importlib.reload(core.config)
+
 

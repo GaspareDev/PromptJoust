@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import pytest
 from core.types import (
     ActionType,
@@ -199,6 +200,30 @@ def test_confused_states_and_boss_exhaustion():
     assert h2.damage_dealt == 0
     assert b2.damage_dealt == 0
     assert any("[CONFUSED]" in e for e in ev2)
+
+    # Hero CONFUSED vs Boss ATTACK
+    d_ca = make_decision(ActionType.CONFUSED, ActionType.ATTACK)
+    h_ca, b_ca, ev_ca, _, _ = resolve_round_actions(hero_state, boss_state, d_ca)
+    assert b_ca.damage_dealt == (25 - 10)
+
+    # Hero CONFUSED vs Boss HEAVY_ATTACK
+    boss_state.current_sta = 50
+    d3 = make_decision(ActionType.CONFUSED, ActionType.HEAVY_ATTACK)
+    h3, b3, ev3, _, _ = resolve_round_actions(hero_state, boss_state, d3)
+    assert b3.damage_dealt == math.ceil(25 * 1.8)
+    assert b3.action == ActionType.HEAVY_ATTACK
+
+
+    # Boss CONFUSED vs Hero ATTACK
+    d4 = make_decision(ActionType.ATTACK, ActionType.CONFUSED)
+    h4, b4, ev4, _, _ = resolve_round_actions(hero_state, boss_state, d4)
+    assert h4.damage_dealt > 0
+
+    # Boss CONFUSED vs Hero HEAVY_ATTACK
+    d5 = make_decision(ActionType.HEAVY_ATTACK, ActionType.CONFUSED)
+    h5, b5, ev5, _, _ = resolve_round_actions(hero_state, boss_state, d5)
+    assert h5.damage_dealt > 0
+
 
 
 def test_staggered_damage_multiplier():

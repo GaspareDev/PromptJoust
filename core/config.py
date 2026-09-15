@@ -70,7 +70,7 @@ try:
         claude_model: str = "claude-3-5-haiku-20241022"
         openai_model: str = "gpt-4o-mini"
         groq_model: str = "llama-3.3-70b-versatile"
-        ollama_model: str = "llama3"
+        ollama_model: str = "llama3.2"
 
         # Server Configuration
         server_host: str = "0.0.0.0"
@@ -104,7 +104,7 @@ except ImportError:
         claude_model: str = Field(default_factory=lambda: os.getenv("CLAUDE_MODEL", "claude-3-5-haiku-20241022"))
         openai_model: str = Field(default_factory=lambda: os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
         groq_model: str = Field(default_factory=lambda: os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
-        ollama_model: str = Field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "llama3"))
+        ollama_model: str = Field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "llama3.2"))
 
         server_host: str = Field(default_factory=lambda: os.getenv("SERVER_HOST", "0.0.0.0"))
         server_port: int = Field(default_factory=lambda: int(os.getenv("SERVER_PORT", "8000")))

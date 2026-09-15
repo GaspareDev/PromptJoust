@@ -118,3 +118,48 @@ def test_server_run_invokes_uvicorn():
         mock_uvicorn.assert_called_once()
 
 
+def test_load_bosses_corrupt_file():
+    from interfaces.web.server import load_bosses
+    with patch("pathlib.Path.glob") as mock_glob:
+        from pathlib import Path
+        fake_file = Path("corrupted_boss.json")
+        mock_glob.return_value = [fake_file]
+        with patch("builtins.open", side_effect=IOError("Corrupt file")):
+            bosses = load_bosses()
+            assert bosses == {}
+
+
+def test_simulate_provider_initialization_error():
+    payload = {
+        "boss_id": "boss_level_01",
+        "hero_name": "WebTactician",
+        "tactical_prompt": "Attack!",
+        "hp_bonus": 5,
+        "atk_bonus": 5,
+        "def_bonus": 5,
+        "sta_bonus": 5,
+        "provider": "unknown_provider_xyz",
+    }
+    resp = client.post("/api/simulate", json=payload)
+    assert resp.status_code == 400
+    assert "Provider initialization error" in resp.json()["detail"]
+
+
+def test_server_module_main_and_sys_path():
+    import runpy
+    import sys
+    from pathlib import Path
+    root = str(Path(__file__).resolve().parent.parent)
+    with patch("uvicorn.run"):
+        # Remove root temporarily so line 21 executes
+        was_in_path = root in sys.path
+        if was_in_path:
+            sys.path.remove(root)
+        try:
+            runpy.run_module("interfaces.web.server", run_name="__main__")
+        finally:
+            if was_in_path and root not in sys.path:
+                sys.path.insert(0, root)
+
+
+

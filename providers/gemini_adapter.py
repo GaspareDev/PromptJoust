@@ -49,6 +49,7 @@ class GeminiProvider(BaseLLMProvider):
                     response_mime_type="application/json",
                     response_schema=schema,
                     temperature=0.2,
+                    max_output_tokens=250,
                 ),
             )
             return response.text
@@ -71,11 +72,13 @@ class GeminiProvider(BaseLLMProvider):
                 "response_mime_type": "application/json",
                 "response_schema": schema,
                 "temperature": 0.2,
+                "maxOutputTokens": 250,
             },
         }
 
-        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        resp = requests.post(url, headers=headers, json=payload, timeout=settings.default_timeout)
         resp.raise_for_status()
         data = resp.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         return text
+

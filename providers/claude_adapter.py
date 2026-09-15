@@ -53,11 +53,12 @@ class ClaudeProvider(BaseLLMProvider):
         user_prompt: str,
         schema: Dict[str, Any],
     ) -> Union[str, TurnDecision]:
+        compact_schema = json.dumps(schema, separators=(",", ":"))
         prompt_with_instructions = (
             f"{user_prompt}\n\n"
             f"[CRITICAL FORMAT INSTRUCTION]\n"
             f"You MUST output valid, parseable JSON strictly adhering to this schema:\n"
-            f"{json.dumps(schema, indent=2)}\n"
+            f"{compact_schema}\n"
             f"Do not include any conversational preamble, explanations, or text outside the JSON structure."
         )
 
@@ -66,7 +67,7 @@ class ClaudeProvider(BaseLLMProvider):
             try:
                 response = self._client.messages.create(
                     model=self.model,
-                    max_tokens=1000,
+                    max_tokens=250,
                     system=system_prompt,
                     messages=[
                         {"role": "user", "content": prompt_with_instructions}
@@ -90,12 +91,13 @@ class ClaudeProvider(BaseLLMProvider):
         }
         payload = {
             "model": self.model,
-            "max_tokens": 1000,
+            "max_tokens": 250,
             "system": system_prompt,
             "messages": [
                 {"role": "user", "content": prompt_with_instructions}
             ],
         }
+
 
         try:
             resp = requests.post(
