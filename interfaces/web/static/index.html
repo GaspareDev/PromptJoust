@@ -3,179 +3,210 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PromptJoust: The Tactician Edition</title>
+  <title>PromptJoust: The Grand Tournament</title>
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;800;900&family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=MedievalSharp&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="app-container">
-    <header class="cyber-header">
+  <div class="app-container medieval-frame">
+    <!-- Medieval Banner Header -->
+    <header class="banner-header">
       <div class="logo">
-        <span class="glitch" data-text="PROMPT JOUST">PROMPT JOUST</span>
-        <span class="edition">THE TACTICIAN EDITION</span>
+        <div class="crest-icon">⚔️</div>
+        <div>
+          <span class="banner-title">PROMPT JOUST</span>
+          <span class="edition">⚜️ THE GRAND TOURNAMENT ⚜️</span>
+        </div>
       </div>
-      <div class="status-pill">
-        <span class="indicator-dot"></span>
-        <span id="provider-badge">ARBITRATION: GEMINI</span>
+      <div class="status-pill arbiter-badge">
+        <span class="indicator-gem"></span>
+        <span id="provider-badge">HIGH ARBITER: OLLAMA</span>
       </div>
     </header>
 
     <main class="grid-layout">
-      <!-- Left Column: Boss Dossier & Config -->
-      <section class="panel boss-panel">
+      <!-- Left Column: Monster Bestiary & Arbiter Config -->
+      <section class="panel bestiary-panel">
         <div class="panel-header">
-          <h2>🎯 TARGET BOSS DOSSIER</h2>
-          <select id="boss-select" class="cyber-select"></select>
+          <h2>📜 FOE BESTIARY & DOSSIER</h2>
+          <select id="boss-select" class="rpg-select"></select>
         </div>
 
-        <div id="boss-card" class="boss-card">
-          <div class="boss-title-row">
-            <h3 id="boss-name">Loading...</h3>
-            <span id="boss-floor" class="badge">FLOOR 1</span>
+        <div id="boss-card" class="boss-card parchment-card">
+          <div class="boss-header-box">
+            <div id="boss-portrait-badge" class="portrait-badge crest-ferrum">
+              <span class="portrait-icon" id="boss-portrait-icon">🤖</span>
+            </div>
+            <div class="boss-title-details">
+              <div class="boss-title-row">
+                <h3 id="boss-name">Summoning Foe...</h3>
+                <span id="boss-floor" class="badge floor-badge">FLOOR 1</span>
+              </div>
+              <p id="boss-lore" class="lore-text"></p>
+            </div>
           </div>
-          <p id="boss-lore" class="lore-text"></p>
           
           <div class="stats-grid">
-            <div class="stat-box"><span>HP</span><b id="boss-hp">0</b></div>
-            <div class="stat-box"><span>ATK</span><b id="boss-atk">0</b></div>
-            <div class="stat-box"><span>DEF</span><b id="boss-def">0</b></div>
-            <div class="stat-box"><span>STA</span><b id="boss-sta">0</b></div>
+            <div class="stat-box hp-box"><span>❤️ HP</span><b id="boss-hp">0</b></div>
+            <div class="stat-box atk-box"><span>⚔️ ATK</span><b id="boss-atk">0</b></div>
+            <div class="stat-box def-box"><span>🛡️ DEF</span><b id="boss-def">0</b></div>
+            <div class="stat-box sta-box"><span>⚡ STA</span><b id="boss-sta">0</b></div>
           </div>
 
           <div class="hints-box">
-            <h4>💡 VISIBLE INTEL & WEAKNESSES:</h4>
+            <h4>💡 VISIBLE WEAKNESSES & LORE INTEL:</h4>
             <ul id="boss-hints"></ul>
           </div>
         </div>
 
-        <!-- LLM Provider Settings -->
+        <!-- Arbiter Council Settings -->
         <div class="settings-box">
-          <h3>⚙️ REFEREE ENGINE</h3>
+          <h3>⚖️ HIGH ARBITER'S COUNCIL</h3>
           <div class="form-row">
-            <label>Provider:</label>
-            <select id="provider-select" class="cyber-select">
-              <option value="gemini" selected>Google Gemini (Flash)</option>
+            <label>Summon Arbiter:</label>
+            <select id="provider-select" class="rpg-select">
+              <option value="ollama" selected>Ollama Local (Offline AI)</option>
+              <option value="gemini">Google Gemini (Flash)</option>
               <option value="claude">Anthropic Claude (3.5 Sonnet / Haiku)</option>
               <option value="openai">OpenAI (gpt-4o-mini)</option>
               <option value="groq">Groq (Llama 3)</option>
-              <option value="ollama">Ollama Local (Offline AI)</option>
             </select>
           </div>
         </div>
       </section>
 
-      <!-- Middle/Right Column: Hero Tactician Deck & Arena -->
+      <!-- Right Column: Champion's Codex & Tactical Deck -->
       <section class="panel hero-panel">
         <div class="panel-header">
-          <h2>🛡️ BOTMASTER TACTICIAN DECK</h2>
+          <h2>🛡️ CHAMPION'S CODEX & ARMS</h2>
           <div class="points-budget">
-            BONUS POOL: <span id="remaining-points">0</span> / 20 PTS
+            VALOR POOL: <span id="remaining-points">0</span> / 20 PTS
           </div>
         </div>
 
-        <!-- Build Presets & Import Replay -->
+        <!-- Build Presets & Import Replay with Wax Seals -->
         <div class="preset-chips">
-          <span class="preset-label">Build Presets:</span>
-          <button type="button" class="chip-btn" onclick="applyPreset(5,5,5,5)">⚖️ Balanced</button>
-          <button type="button" class="chip-btn" onclick="applyPreset(0,15,0,5)">🗡️ Glass Cannon</button>
-          <button type="button" class="chip-btn" onclick="applyPreset(10,0,10,0)">🛡️ Juggernaut</button>
+          <span class="preset-label">Heraldic Seals:</span>
+          <button type="button" class="chip-btn wax-seal" onclick="applyPreset(5,5,5,5)">⚖️ Balanced</button>
+          <button type="button" class="chip-btn wax-seal" onclick="applyPreset(0,15,0,5)">🗡️ Glass Cannon</button>
+          <button type="button" class="chip-btn wax-seal" onclick="applyPreset(10,0,10,0)">🛡️ Juggernaut</button>
           <input type="file" id="replay-file-input" accept=".json" style="display:none;">
-          <button type="button" class="chip-btn import-btn" onclick="document.getElementById('replay-file-input').click()">📂 Import Replay</button>
+          <button type="button" class="chip-btn import-btn wax-seal" onclick="document.getElementById('replay-file-input').click()">📜 Import Replay</button>
         </div>
 
-
-        <!-- Stat Allocation Sliders -->
+        <!-- Stat Allocation Sliders with Graduated Ticks -->
         <div class="allocator-container">
           <div class="stat-slider-row">
-            <label>HP Bonus (+<span id="hp-val">5</span> pts = <span id="hp-calc">110</span> HP)</label>
-            <input type="range" id="slider-hp" min="0" max="20" value="5" class="slider">
+            <label for="slider-hp">
+              <span class="stat-label-name">❤️ Health (HP)</span>
+              <span class="stat-label-calc">+<span id="hp-val">5</span> pts ➔ <span id="hp-calc">110</span> HP</span>
+            </label>
+            <input type="range" id="slider-hp" min="0" max="20" value="5" class="slider slider-hp">
+            <div class="slider-ticks"><span>0</span><span>V</span><span>X</span><span>XV</span><span>XX</span></div>
           </div>
           <div class="stat-slider-row">
-            <label>ATK Bonus (+<span id="atk-val">5</span> pts = <span id="atk-calc">20</span> ATK)</label>
-            <input type="range" id="slider-atk" min="0" max="20" value="5" class="slider">
+            <label for="slider-atk">
+              <span class="stat-label-name">⚔️ Attack (ATK)</span>
+              <span class="stat-label-calc">+<span id="atk-val">5</span> pts ➔ <span id="atk-calc">20</span> ATK</span>
+            </label>
+            <input type="range" id="slider-atk" min="0" max="20" value="5" class="slider slider-atk">
+            <div class="slider-ticks"><span>0</span><span>V</span><span>X</span><span>XV</span><span>XX</span></div>
           </div>
           <div class="stat-slider-row">
-            <label>DEF Bonus (+<span id="def-val">5</span> pts = <span id="def-calc">15</span> DEF)</label>
-            <input type="range" id="slider-def" min="0" max="20" value="5" class="slider">
+            <label for="slider-def">
+              <span class="stat-label-name">🛡️ Defense (DEF)</span>
+              <span class="stat-label-calc">+<span id="def-val">5</span> pts ➔ <span id="def-calc">15</span> DEF</span>
+            </label>
+            <input type="range" id="slider-def" min="0" max="20" value="5" class="slider slider-def">
+            <div class="slider-ticks"><span>0</span><span>V</span><span>X</span><span>XV</span><span>XX</span></div>
           </div>
           <div class="stat-slider-row">
-            <label>STA Bonus (+<span id="sta-val">5</span> pts = <span id="sta-calc">55</span> STA)</label>
-            <input type="range" id="slider-sta" min="0" max="20" value="5" class="slider">
+            <label for="slider-sta">
+              <span class="stat-label-name">⚡ Stamina (STA)</span>
+              <span class="stat-label-calc">+<span id="sta-val">5</span> pts ➔ <span id="sta-calc">55</span> STA</span>
+            </label>
+            <input type="range" id="slider-sta" min="0" max="20" value="5" class="slider slider-sta">
+            <div class="slider-ticks"><span>0</span><span>V</span><span>X</span><span>XV</span><span>XX</span></div>
           </div>
         </div>
 
-        <!-- Tactical Prompt Directive -->
+        <!-- Tactical Scroll Directive -->
         <div class="prompt-box">
           <div class="prompt-header">
-            <label for="tactical-prompt">TACTICAL DIRECTIVE (MAX 280 CHARS):</label>
+            <label for="tactical-prompt">📜 BATTLE DIRECTIVE SCROLL (MAX 280 RUNES):</label>
             <div class="prompt-actions">
-              <button type="button" id="suggest-prompt-btn" class="chip-btn">💡 Auto-Suggest Strategy</button>
+              <button type="button" id="suggest-prompt-btn" class="chip-btn">🔮 Divinate Strategy</button>
               <span id="char-counter" class="char-ok">0 / 280</span>
             </div>
           </div>
-          <textarea id="tactical-prompt" class="cyber-textarea" placeholder="Enter high-level tactical orders (e.g. 'Use swift attacks if boss shields. Taunt with NullPointer bugs to break memory logic.')..."></textarea>
+          <textarea id="tactical-prompt" class="rpg-textarea" placeholder="Inscribe combat orders for your champion (e.g. 'Strike with swift blade thrusts if the foe guards. Taunt with NullPointer curses to fracture its mind.')..."></textarea>
         </div>
 
-        <button id="start-joust-btn" class="cyber-button pulse-glow">
-          ⚔️ ENGAGE 10-ROUND JOUST
+        <button id="start-joust-btn" class="rpg-button gold-button">
+          ⚔️ COMMENCE THE GRAND JOUST (10 ROUNDS)
         </button>
       </section>
     </main>
 
-    <!-- Holographic Simulation Loading Overlay -->
+    <!-- Divination & Summoning Chamber Overlay -->
     <div id="loading-overlay" class="overlay hidden">
-      <div class="loading-modal">
-        <div class="cyber-spinner">
-          <div class="spinner-ring ring-1"></div>
-          <div class="spinner-ring ring-2"></div>
-          <div class="spinner-core">⚔️</div>
+      <div class="loading-modal runic-chamber">
+        <div class="runic-circle">
+          <div class="rune-ring ring-outer"></div>
+          <div class="rune-ring ring-inner"></div>
+          <div class="rune-core">⚔️</div>
         </div>
-        <h3 class="loading-title">ARBITRATING TACTICAL MATCH</h3>
-        <p class="loading-sub">Autonomous LLM Multi-Round Neural Exchange</p>
+        <h3 class="loading-title">ARBITRATING THE DUEL</h3>
+        <p class="loading-sub">The High Arbiter is calculating the turns of destiny...</p>
         
         <div class="loading-bar-track">
           <div class="loading-bar-fill"></div>
         </div>
 
-        <div class="terminal-logs">
-          <p class="term-line active" id="term-step-1">⚡ Connecting to referee neural arbitration grid...</p>
-          <p class="term-line" id="term-step-2">🛡️ Sandboxing & validating tactical instructions...</p>
-          <p class="term-line" id="term-step-3">⚔️ Resolving 10-round deterministic combat math...</p>
-          <p class="term-line" id="term-step-4">📊 Synthesizing arena telemetry & combat logs...</p>
+        <div class="chronicle-logs">
+          <p class="chronicle-line active" id="term-step-1">🔮 Summoning the High Arbiter's tribunal...</p>
+          <p class="chronicle-line" id="term-step-2">🛡️ Inscribing champion directives onto the battle slate...</p>
+          <p class="chronicle-line" id="term-step-3">⚔️ Resolving 10-round martial combat mathematics...</p>
+          <p class="chronicle-line" id="term-step-4">📜 Compiling arena chronicles & victory scrolls...</p>
         </div>
       </div>
     </div>
 
-    <!-- Arena Live Simulation Modal / Stage -->
+    <!-- Grand Arena Live Simulation Modal / Stage -->
     <div id="arena-overlay" class="overlay hidden">
-
-      <div class="arena-modal">
+      <div class="arena-modal grand-arena">
         <div class="arena-header">
-          <h2 id="arena-round-title">ROUND 1 / 5</h2>
-          <button id="close-arena-btn" class="close-btn">&times;</button>
+          <h2 id="arena-round-title">ROUND 1 / 10 • ⚔️ HERO ATTACK TURN</h2>
+          <button id="close-arena-btn" class="close-btn" title="Leave Arena">&times;</button>
         </div>
 
         <!-- Fighter Stages -->
         <div class="arena-stage">
-          <div class="fighter-card hero-fighter">
+          <div class="fighter-card hero-fighter" id="hero-fighter-card">
+            <div class="floating-vfx-anchor" id="hero-vfx-anchor"></div>
             <div class="fighter-header">
               <div class="name-role">
-                <h3>🛡️ HERO TACTICIAN</h3>
-                <span id="hero-role-badge" class="role-badge role-attacker">⚔️ ATTACKER</span>
+                <div class="fighter-portrait crest-hero">🛡️</div>
+                <div>
+                  <h3>HERO TACTICIAN</h3>
+                  <span id="hero-role-badge" class="role-badge role-attacker">⚔️ ATTACKER</span>
+                </div>
               </div>
               <span id="hero-status-tag" class="status-tag">NORMAL</span>
             </div>
-            <div class="gauge-bar">
-              <span class="gauge-label">HP: <b id="hero-hp-display">100/100</b></span>
-              <div class="gauge-track"><div id="hero-hp-bar" class="gauge-fill hp-fill" style="width: 100%"></div></div>
+            <div class="gauge-bar vial-gauge">
+              <span class="gauge-label">❤️ Health (HP): <b id="hero-hp-display">100/100</b></span>
+              <div class="gauge-track"><div id="hero-hp-bar" class="gauge-fill hp-fill" style="width: 100%"><div class="vial-shine"></div></div></div>
             </div>
-            <div class="gauge-bar">
-              <span class="gauge-label">STA: <b id="hero-sta-display">50/100</b></span>
-              <div class="gauge-track"><div id="hero-sta-bar" class="gauge-fill sta-fill" style="width: 50%"></div></div>
+            <div class="gauge-bar vial-gauge">
+              <span class="gauge-label">⚡ Vigor (STA): <b id="hero-sta-display">50/100</b></span>
+              <div class="gauge-track"><div id="hero-sta-bar" class="gauge-fill sta-fill" style="width: 50%"><div class="vial-shine"></div></div></div>
             </div>
-            <div class="intent-box">
+            <div class="intent-box scroll-intent">
               <div class="action-row">
-                <div class="action-tag" id="hero-action-tag">ATTACK</div>
+                <div class="action-tag" id="hero-action-tag">⚔️ ATTACK</div>
                 <span class="stat-deltas" id="hero-deltas">⚔️ Dealt: 0 DMG</span>
               </div>
               <p class="dialogue-quote" id="hero-banter-quote">"..."</p>
@@ -183,27 +214,34 @@
             </div>
           </div>
 
-          <div class="vs-divider">VS</div>
+          <div class="vs-divider">
+            <span class="vs-rune">⚔️</span>
+            <span>VS</span>
+          </div>
 
           <div class="fighter-card boss-fighter" id="boss-fighter-card">
+            <div class="floating-vfx-anchor" id="boss-vfx-anchor"></div>
             <div class="fighter-header">
               <div class="name-role">
-                <h3 id="arena-boss-name">👾 BOSS</h3>
-                <span id="boss-role-badge" class="role-badge role-defender">🛡️ DEFENDER</span>
+                <div class="fighter-portrait" id="boss-arena-portrait">👾</div>
+                <div>
+                  <h3 id="arena-boss-name">BOSS</h3>
+                  <span id="boss-role-badge" class="role-badge role-defender">🛡️ DEFENDER</span>
+                </div>
               </div>
               <span id="boss-status-tag" class="status-tag">NORMAL</span>
             </div>
-            <div class="gauge-bar">
-              <span class="gauge-label">HP: <b id="boss-hp-display">100/100</b></span>
-              <div class="gauge-track"><div id="boss-hp-bar" class="gauge-fill hp-fill" style="width: 100%"></div></div>
+            <div class="gauge-bar vial-gauge">
+              <span class="gauge-label">❤️ Health (HP): <b id="boss-hp-display">100/100</b></span>
+              <div class="gauge-track"><div id="boss-hp-bar" class="gauge-fill hp-fill" style="width: 100%"><div class="vial-shine"></div></div></div>
             </div>
-            <div class="gauge-bar">
-              <span class="gauge-label">STA: <b id="boss-sta-display">50/100</b></span>
-              <div class="gauge-track"><div id="boss-sta-bar" class="gauge-fill sta-fill" style="width: 50%"></div></div>
+            <div class="gauge-bar vial-gauge">
+              <span class="gauge-label">⚡ Vigor (STA): <b id="boss-sta-display">50/100</b></span>
+              <div class="gauge-track"><div id="boss-sta-bar" class="gauge-fill sta-fill" style="width: 50%"><div class="vial-shine"></div></div></div>
             </div>
-            <div class="intent-box">
+            <div class="intent-box scroll-intent">
               <div class="action-row">
-                <div class="action-tag" id="boss-action-tag">ATTACK</div>
+                <div class="action-tag" id="boss-action-tag">🛡️ DEFEND</div>
                 <span class="stat-deltas" id="boss-deltas">⚔️ Dealt: 0 DMG</span>
               </div>
               <p class="dialogue-quote" id="boss-banter-quote">"..."</p>
@@ -212,25 +250,45 @@
           </div>
         </div>
 
-        <!-- Combat Feed & Referee Log -->
-        <div class="combat-feed-box">
-          <h4>⚖️ REFEREE ARBITRATION & EVENTS:</h4>
+        <!-- Tournament Chronicle & Arbiter Log -->
+        <div class="combat-feed-box chronicle-scroll">
+          <h4>📜 CHRONICLES OF THE ARBITER & COMBAT LOG:</h4>
           <div id="round-events-list" class="events-list"></div>
         </div>
 
         <!-- Playback Controls & Replay Sharing -->
         <div class="playback-bar">
-          <button id="prev-round-btn" class="cyber-btn-small">◀ PREV</button>
-          <button id="auto-play-btn" class="cyber-btn-small active">▶ AUTO PLAY</button>
-          <button id="next-round-btn" class="cyber-btn-small">NEXT ▶</button>
-          <button id="export-replay-btn" class="cyber-btn-small action-btn">💾 EXPORT REPLAY</button>
-          <button id="share-replay-btn" class="cyber-btn-small action-btn">🔗 SHARE LINK</button>
+          <button id="prev-round-btn" class="rpg-btn-small">◀ PREV</button>
+          <button id="auto-play-btn" class="rpg-btn-small active">▶ AUTO PLAY</button>
+          <button id="next-round-btn" class="rpg-btn-small">NEXT ▶</button>
+          <button id="export-replay-btn" class="rpg-btn-small action-btn">📜 EXPORT REPLAY</button>
+          <button id="share-replay-btn" class="rpg-btn-small action-btn">🔗 SHARE LINK</button>
           <div id="final-verdict-banner" class="verdict-banner hidden"></div>
         </div>
       </div>
     </div>
 
-    <!-- Notification Toast -->
+    <!-- Royal Decree Unfolding Epilogue Modal -->
+    <div id="decree-overlay" class="overlay hidden">
+      <div class="decree-scroll-modal">
+        <div class="decree-seal-header">⚜️ ROYAL TOURNAMENT DECREE ⚜️</div>
+        <div class="decree-body">
+          <div class="decree-emblem" id="decree-emblem">🏆</div>
+          <h2 id="decree-title" class="decree-title">ROYAL VICTORY</h2>
+          <p id="decree-verdict" class="decree-verdict"></p>
+          <div class="decree-summary-grid">
+            <div class="decree-stat"><span>ROUNDS FOUGHT</span><b id="decree-rounds">10</b></div>
+            <div class="decree-stat"><span>HERO HEALTH</span><b id="decree-hero-hp">100 HP</b></div>
+            <div class="decree-stat"><span>FOE HEALTH</span><b id="decree-boss-hp">0 HP</b></div>
+          </div>
+        </div>
+        <div class="decree-actions">
+          <button type="button" class="rpg-button gold-button decree-btn" id="close-decree-btn">⚔️ REPLAY / VIEW ROUNDS</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heraldic Notification Toast -->
     <div id="toast" class="toast hidden"></div>
   </div>
 

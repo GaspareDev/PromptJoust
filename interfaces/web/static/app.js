@@ -44,7 +44,7 @@ function initUI() {
 
   document.getElementById("provider-select").addEventListener("change", (e) => {
     const p = e.target.value;
-    document.getElementById("provider-badge").textContent = `ARBITRATION: ${p.toUpperCase()}`;
+    document.getElementById("provider-badge").textContent = `HIGH ARBITER: ${p.toUpperCase()}`;
   });
 
   document.getElementById("start-joust-btn").addEventListener("click", startSimulation);
@@ -56,12 +56,20 @@ function initUI() {
   document.getElementById("export-replay-btn").addEventListener("click", exportReplay);
   document.getElementById("share-replay-btn").addEventListener("click", generateShareableLink);
   document.getElementById("replay-file-input").addEventListener("change", handleImportReplay);
+  const closeDecreeBtn = document.getElementById("close-decree-btn");
+  if (closeDecreeBtn) closeDecreeBtn.addEventListener("click", closeDecree);
 
   updateAllocations();
   checkUrlReplayHash();
 }
 
-
+/**
+ * Applies a predefined stat allocation preset to the attribute sliders.
+ * @param {number} hp - Health points bonus (0-20).
+ * @param {number} atk - Attack points bonus (0-20).
+ * @param {number} def - Defense points bonus (0-20).
+ * @param {number} sta - Stamina points bonus (0-20).
+ */
 function applyPreset(hp, atk, def, sta) {
   document.getElementById("slider-hp").value = hp;
   document.getElementById("slider-atk").value = atk;
@@ -109,7 +117,7 @@ function suggestTacticalPrompt() {
   suggestionIndices[currentBossId]++;
   
   handlePromptInput({ target: promptInput });
-  showToast(`💡 Applied Strategy Preset #${currentIdx + 1}`);
+  showToast(`🔮 Divinated Strategy #${currentIdx + 1}`);
 }
 
 /**
@@ -200,9 +208,35 @@ async function fetchProviders() {
   }
 }
 
+/**
+ * Returns heraldic visual metadata (icon, CSS class, display title) for a given boss ID.
+ * @param {string} bossId - Canonical boss identifier (e.g. 'boss_level_01').
+ * @returns {{icon: string, cls: string, name: string}} Crest metadata object.
+ */
+function getBossCrestMeta(bossId) {
+  const meta = {
+    boss_level_01: { icon: "⚙️", cls: "crest-ferrum", name: "Ferrum" },
+    boss_level_02: { icon: "👻", cls: "crest-wraith", name: "NullPointer Wraith" },
+    boss_level_03: { icon: "🔮", cls: "crest-hallucinator", name: "The Hallucinator" },
+  };
+  return meta[bossId] || { icon: "👾", cls: "crest-ferrum", name: "Monster Foe" };
+}
+
+/**
+ * Updates the Bestiary dossier view with details, lore, and stats of the selected boss.
+ * @param {string} bossId - Canonical boss identifier.
+ */
 function renderBossDetails(bossId) {
   const boss = allBosses.find(b => b.id === bossId);
   if (!boss) return;
+
+  const crest = getBossCrestMeta(bossId);
+  const badgeEl = document.getElementById("boss-portrait-badge");
+  const iconEl = document.getElementById("boss-portrait-icon");
+  if (badgeEl && iconEl) {
+    badgeEl.className = `portrait-badge ${crest.cls}`;
+    iconEl.textContent = crest.icon;
+  }
 
   document.getElementById("boss-name").textContent = boss.name;
   document.getElementById("boss-floor").textContent = `FLOOR ${boss.floor}`;
@@ -223,6 +257,9 @@ function renderBossDetails(bossId) {
 
 let loadingInterval = null;
 
+/**
+ * Activates the runic summoning chamber overlay and animates the arbitration steps.
+ */
 function showLoadingScreen() {
   const overlay = document.getElementById("loading-overlay");
   overlay.classList.remove("hidden");
@@ -235,26 +272,32 @@ function showLoadingScreen() {
   ];
 
   steps.forEach((s, idx) => {
-    s.className = idx === 0 ? "term-line active" : "term-line";
+    s.className = idx === 0 ? "chronicle-line active" : "chronicle-line";
   });
 
   let currentStep = 0;
   clearInterval(loadingInterval);
   loadingInterval = setInterval(() => {
     if (currentStep < steps.length - 1) {
-      steps[currentStep].className = "term-line done";
+      steps[currentStep].className = "chronicle-line done";
       currentStep++;
-      steps[currentStep].className = "term-line active";
+      steps[currentStep].className = "chronicle-line active";
     }
   }, 750);
 }
 
+/**
+ * Hides the runic summoning chamber overlay once match simulation completes.
+ */
 function hideLoadingScreen() {
   clearInterval(loadingInterval);
   const overlay = document.getElementById("loading-overlay");
   overlay.classList.add("hidden");
 }
 
+/**
+ * Sends combat simulation payload to the FastAPI backend and opens the Grand Arena.
+ */
 async function startSimulation() {
   const bossId = document.getElementById("boss-select").value;
   const prompt = document.getElementById("tactical-prompt").value.trim() || 
@@ -268,13 +311,13 @@ async function startSimulation() {
 
   const total = hp + atk + def + sta;
   if (total !== TOTAL_BONUS_POOL) {
-    alert(`Please allocate all ${TOTAL_BONUS_POOL} bonus points (currently allocated: ${total}).`);
+    alert(`Please allocate all ${TOTAL_BONUS_POOL} valor points (currently allocated: ${total}).`);
     return;
   }
 
   const btn = document.getElementById("start-joust-btn");
   btn.disabled = true;
-  btn.textContent = "⚙️ ARBITRATING 10-ROUND MATCH...";
+  btn.textContent = "⚖️ HIGH ARBITER IS ARBITRATING...";
 
   showLoadingScreen();
 
@@ -306,24 +349,59 @@ async function startSimulation() {
     alert(`Error: ${err.message}`);
   } finally {
     btn.disabled = false;
-    btn.textContent = "⚔️ ENGAGE 10-ROUND JOUST";
+    btn.textContent = "⚔️ COMMENCE THE GRAND JOUST (10 ROUNDS)";
   }
 }
 
-
+/**
+ * Opens the Grand Arena live playback stage for the current simulation.
+ */
 function openArena() {
   document.getElementById("arena-overlay").classList.remove("hidden");
-  const selectedBoss = allBosses.find(b => b.id === document.getElementById("boss-select").value);
-  document.getElementById("arena-boss-name").textContent = selectedBoss ? `👾 ${selectedBoss.name}` : "👾 BOSS";
+  const selectedBossId = document.getElementById("boss-select").value;
+  const selectedBoss = allBosses.find(b => b.id === selectedBossId);
+  const crest = getBossCrestMeta(selectedBossId);
+
+  const bossPortrait = document.getElementById("boss-arena-portrait");
+  if (bossPortrait) {
+    bossPortrait.className = `fighter-portrait ${crest.cls}`;
+    bossPortrait.textContent = crest.icon;
+  }
+
+  document.getElementById("arena-boss-name").textContent = selectedBoss ? selectedBoss.name : "BOSS";
 
   currentRoundIndex = 0;
   renderArenaRound(currentRoundIndex);
   startAutoPlay();
 }
 
+/**
+ * Closes the Grand Arena modal and halts playback.
+ */
 function closeArena() {
   stopAutoPlay();
   document.getElementById("arena-overlay").classList.add("hidden");
+  closeDecree();
+}
+
+/**
+ * Spawns dynamic floating combat text (e.g. damage, block, dodge) anchored to a fighter card.
+ * @param {string} anchorId - DOM ID of the VFX anchor element.
+ * @param {string} text - Floating text string.
+ * @param {string} typeCls - CSS styling class ('dmg', 'crit', 'guard', 'dodge', 'hex').
+ */
+function spawnCombatVfx(anchorId, text, typeCls) {
+  const anchor = document.getElementById(anchorId);
+  if (!anchor) return;
+
+  const vfx = document.createElement("div");
+  vfx.className = `floating-combat-text ${typeCls}`;
+  vfx.textContent = text;
+  anchor.appendChild(vfx);
+
+  setTimeout(() => {
+    if (vfx.parentNode) vfx.parentNode.removeChild(vfx);
+  }, 1200);
 }
 
 function renderArenaRound(idx) {
@@ -355,12 +433,12 @@ function renderArenaRound(idx) {
 
   // Action Icon & Styling mappings
   const actionMeta = {
-    "ATTACK": { icon: "⚔️", label: "ATTACK", cls: "act-attack" },
-    "HEAVY_ATTACK": { icon: "💥", label: "HEAVY ATTACK", cls: "act-heavy" },
-    "DEFEND": { icon: "🛡️", label: "DEFEND", cls: "act-defend" },
-    "DODGE": { icon: "💨", label: "DODGE", cls: "act-dodge" },
-    "PSYCH_WARFARE": { icon: "🧠", label: "PSYCH WARFARE", cls: "act-psych" },
-    "CONFUSED": { icon: "💫", label: "CONFUSED", cls: "act-confused" },
+    "ATTACK": { icon: "⚔️", label: "STRIKE", cls: "act-attack" },
+    "HEAVY_ATTACK": { icon: "💥", label: "MIGHTY CLEAVE", cls: "act-heavy" },
+    "DEFEND": { icon: "🛡️", label: "SHIELD GUARD", cls: "act-defend" },
+    "DODGE": { icon: "💨", label: "SWIFT EVASION", cls: "act-dodge" },
+    "PSYCH_WARFARE": { icon: "🔮", label: "ARCANE TAUNT", cls: "act-psych" },
+    "CONFUSED": { icon: "💫", label: "BEWILDERED", cls: "act-confused" },
   };
 
   const heroAct = round.turn_decision.hero_intent.action;
@@ -382,7 +460,7 @@ function renderArenaRound(idx) {
   heroActionTag.className = `action-tag ${heroMeta.cls}`;
 
   const heroBanter = (round.turn_decision.hero_intent.banter || "").trim();
-  document.getElementById("hero-banter-quote").textContent = heroBanter ? `"${heroBanter}"` : `"Forward!"`;
+  document.getElementById("hero-banter-quote").textContent = heroBanter ? `"${heroBanter}"` : `"For glory and honor!"`;
   document.getElementById("hero-intent-note").textContent = round.turn_decision.hero_intent.tactical_reasoning;
 
   // Hero Delta info
@@ -421,6 +499,29 @@ function renderArenaRound(idx) {
     bossDeltas.textContent = `STA: -${round.boss_resolution.stamina_spent}`;
   }
 
+  // Trigger floating combat damage VFX
+  if (round.boss_resolution.damage_dealt > 0) {
+    const isHeavy = (bossAct === "HEAVY_ATTACK");
+    spawnCombatVfx("hero-vfx-anchor", `💥 -${round.boss_resolution.damage_dealt} HP`, isHeavy ? "crit" : "dmg");
+  } else if (heroAct === "DEFEND") {
+    spawnCombatVfx("hero-vfx-anchor", `🛡️ BLOCKED`, "guard");
+  } else if (heroAct === "DODGE") {
+    spawnCombatVfx("hero-vfx-anchor", `💨 DODGED!`, "dodge");
+  }
+
+  if (round.hero_resolution.damage_dealt > 0) {
+    const isHeavy = (heroAct === "HEAVY_ATTACK");
+    spawnCombatVfx("boss-vfx-anchor", `💥 -${round.hero_resolution.damage_dealt} HP`, isHeavy ? "crit" : "dmg");
+  } else if (bossAct === "DEFEND") {
+    spawnCombatVfx("boss-vfx-anchor", `🛡️ BLOCKED`, "guard");
+  } else if (bossAct === "DODGE") {
+    spawnCombatVfx("boss-vfx-anchor", `💨 DODGED!`, "dodge");
+  }
+
+  if (heroAct === "PSYCH_WARFARE") {
+    spawnCombatVfx("boss-vfx-anchor", `🔮 MIND HEX!`, "hex");
+  }
+
   // Trigger impact animation if damage was taken
   const heroCard = document.querySelector(".hero-fighter");
   const bossCard = document.getElementById("boss-fighter-card");
@@ -437,30 +538,82 @@ function renderArenaRound(idx) {
     bossCard.classList.add("card-damaged");
   }
 
-  // Events & Referee summary
+  // Events & Arbiter summary
   const eventsList = document.getElementById("round-events-list");
-  eventsList.innerHTML = `<p style="color:#ffe600; margin-bottom:6px;"><strong>Referee:</strong> ${round.turn_decision.referee_summary}</p>` +
-    round.combat_events.map(ev => `<p>💥 ${ev}</p>`).join("");
+  eventsList.innerHTML = `<p style="color:#f3e5ab; margin-bottom:8px;"><strong>⚜️ High Arbiter:</strong> ${round.turn_decision.referee_summary}</p>` +
+    round.combat_events.map(ev => `<p>⚔️ ${ev}</p>`).join("");
 
-  // Verdict Banner if last round
+  // Verdict Banner & Decree Modal if last round
   const verdictBanner = document.getElementById("final-verdict-banner");
   if (idx === currentSimulation.rounds_log.length - 1) {
     verdictBanner.classList.remove("hidden");
     if (currentSimulation.winner === "Hero") {
       verdictBanner.className = "verdict-banner win";
-      verdictBanner.textContent = `🏆 VICTORY: ${currentSimulation.victory_reason}`;
+      verdictBanner.textContent = `🏆 ROYAL VICTORY: ${currentSimulation.victory_reason}`;
     } else if (currentSimulation.winner === "Boss") {
       verdictBanner.className = "verdict-banner loss";
-      verdictBanner.textContent = `💀 DEFEAT: ${currentSimulation.victory_reason}`;
+      verdictBanner.textContent = `💀 HONORABLE DEFEAT: ${currentSimulation.victory_reason}`;
     } else {
       verdictBanner.className = "verdict-banner draw";
-      verdictBanner.textContent = `⚖️ DRAW: ${currentSimulation.victory_reason}`;
+      verdictBanner.textContent = `⚖️ ARBITER'S STALEMATE: ${currentSimulation.victory_reason}`;
     }
+    
+    // Show Royal Decree Scroll after short delay if just finished
+    setTimeout(() => {
+      showDecreeModal(currentSimulation);
+    }, 600);
   } else {
     verdictBanner.classList.add("hidden");
   }
 }
 
+/**
+ * Renders and displays the Royal Tournament Decree modal summarizing final match results.
+ * @param {Object} sim - Completed MatchResult simulation object.
+ */
+function showDecreeModal(sim) {
+  if (!sim) return;
+  const overlay = document.getElementById("decree-overlay");
+  const emblem = document.getElementById("decree-emblem");
+  const title = document.getElementById("decree-title");
+  const verdict = document.getElementById("decree-verdict");
+  const rounds = document.getElementById("decree-rounds");
+  const heroHp = document.getElementById("decree-hero-hp");
+  const bossHp = document.getElementById("decree-boss-hp");
+
+  if (sim.winner === "Hero") {
+    emblem.textContent = "🏆";
+    title.textContent = "ROYAL VICTORY";
+    title.style.color = "#15803d";
+  } else if (sim.winner === "Boss") {
+    emblem.textContent = "💀";
+    title.textContent = "HONORABLE DEFEAT";
+    title.style.color = "#8b1820";
+  } else {
+    emblem.textContent = "⚖️";
+    title.textContent = "ARBITER'S STALEMATE";
+    title.style.color = "#d97706";
+  }
+
+  verdict.textContent = sim.victory_reason;
+  rounds.textContent = `${sim.total_rounds} Rounds`;
+  heroHp.textContent = `${sim.hero_final_hp} HP`;
+  bossHp.textContent = `${sim.boss_final_hp} HP`;
+
+  overlay.classList.remove("hidden");
+}
+
+/**
+ * Dismisses the Royal Decree modal.
+ */
+function closeDecree() {
+  const overlay = document.getElementById("decree-overlay");
+  if (overlay) overlay.classList.add("hidden");
+}
+
+/**
+ * Advances combat playback to the next round.
+ */
 function nextRound() {
   if (!currentSimulation) return;
   if (currentRoundIndex < currentSimulation.rounds_log.length - 1) {
@@ -469,6 +622,9 @@ function nextRound() {
   }
 }
 
+/**
+ * Rewinds combat playback to the previous round.
+ */
 function prevRound() {
   if (!currentSimulation) return;
   if (currentRoundIndex > 0) {
@@ -477,6 +633,9 @@ function prevRound() {
   }
 }
 
+/**
+ * Toggles automated round progression on or off.
+ */
 function toggleAutoPlay() {
   if (autoPlayInterval) {
     stopAutoPlay();
@@ -485,6 +644,9 @@ function toggleAutoPlay() {
   }
 }
 
+/**
+ * Starts automated interval-based round playback.
+ */
 function startAutoPlay() {
   stopAutoPlay();
   document.getElementById("auto-play-btn").classList.add("active");
@@ -498,6 +660,9 @@ function startAutoPlay() {
   }, 1800);
 }
 
+/**
+ * Halts automated round progression.
+ */
 function stopAutoPlay() {
   if (autoPlayInterval) {
     clearInterval(autoPlayInterval);
@@ -506,13 +671,16 @@ function stopAutoPlay() {
   document.getElementById("auto-play-btn").classList.remove("active");
 }
 
+/**
+ * Exports current simulation history as a downloadable JSON chronicle file.
+ */
 function exportReplay() {
   if (!currentSimulation) {
     showToast("⚠️ No active battle replay to export!");
     return;
   }
   const winner = currentSimulation.winner ? currentSimulation.winner.toLowerCase() : "draw";
-  const filename = `promptjoust-replay-${winner}-${Date.now()}.json`;
+  const filename = `promptjoust-chronicle-${winner}-${Date.now()}.json`;
   const jsonStr = JSON.stringify(currentSimulation, null, 2);
   const blob = new Blob([jsonStr], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -525,9 +693,13 @@ function exportReplay() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showToast(`💾 Replay exported as ${filename}`);
+  showToast(`📜 Chronicle replay saved as ${filename}`);
 }
 
+/**
+ * Imports a previously exported JSON battle chronicle and launches the Arena playback.
+ * @param {Event} event - File input change event.
+ */
 function handleImportReplay(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -537,19 +709,22 @@ function handleImportReplay(event) {
     try {
       const data = JSON.parse(e.target.result);
       if (!data.rounds_log || !data.total_rounds) {
-        throw new Error("Invalid PromptJoust replay format.");
+        throw new Error("Invalid PromptJoust chronicle format.");
       }
       currentSimulation = data;
       openArena();
-      showToast("📂 Replay successfully loaded!");
+      showToast("📜 Battle chronicle successfully loaded!");
     } catch (err) {
-      alert(`Failed to load replay file: ${err.message}`);
+      alert(`Failed to load chronicle scroll: ${err.message}`);
     }
   };
   reader.readAsText(file);
   event.target.value = ""; // Reset input
 }
 
+/**
+ * Serializes and encodes current simulation to a Base64 URL fragment for instant sharing.
+ */
 function generateShareableLink() {
   if (!currentSimulation) {
     showToast("⚠️ No active battle to share!");
@@ -562,7 +737,7 @@ function generateShareableLink() {
     const shareUrl = `${window.location.origin}${window.location.pathname}#replay=${encoded}`;
 
     navigator.clipboard.writeText(shareUrl).then(() => {
-      showToast("🔗 Battle replay link copied to clipboard!");
+      showToast("🔗 Tournament chronicle link copied to clipboard!");
     }).catch(() => {
       // Fallback
       prompt("Copy this battle replay link:", shareUrl);
@@ -572,6 +747,9 @@ function generateShareableLink() {
   }
 }
 
+/**
+ * Checks for a Base64 `#replay=` fragment in the current URL and automatically opens the replay.
+ */
 function checkUrlReplayHash() {
   if (window.location.hash && window.location.hash.startsWith("#replay=")) {
     try {
@@ -582,7 +760,7 @@ function checkUrlReplayHash() {
         currentSimulation = parsed;
         setTimeout(() => {
           openArena();
-          showToast("🎮 Loaded shared battle replay from URL!");
+          showToast("⚔️ Loaded shared tournament chronicle from link!");
         }, 300);
       }
     } catch (err) {
@@ -591,6 +769,11 @@ function checkUrlReplayHash() {
   }
 }
 
+/**
+ * Renders a floating notification toast message for a specified duration.
+ * @param {string} message - Text notification string.
+ * @param {number} duration - Display time in milliseconds (default 3000ms).
+ */
 function showToast(message, duration = 3000) {
   const toast = document.getElementById("toast");
   if (!toast) return;
@@ -603,4 +786,5 @@ function showToast(message, duration = 3000) {
     toast.classList.add("hidden");
   }, duration);
 }
+
 

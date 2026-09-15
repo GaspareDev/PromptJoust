@@ -54,7 +54,7 @@ try:
         )
 
         # Default Provider
-        default_llm_provider: str = "gemini"
+        default_llm_provider: str = "ollama"
 
         # API Keys & Endpoints
         openai_api_key: Optional[str] = None
@@ -90,7 +90,7 @@ except ImportError:
         """
         Fallback Settings class when pydantic-settings is not installed.
         """
-        default_llm_provider: str = Field(default_factory=lambda: os.getenv("DEFAULT_LLM_PROVIDER", "gemini"))
+        default_llm_provider: str = Field(default_factory=lambda: os.getenv("DEFAULT_LLM_PROVIDER", "ollama"))
 
         openai_api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
         gemini_api_key: Optional[str] = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))

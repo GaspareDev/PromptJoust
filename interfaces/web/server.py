@@ -79,7 +79,7 @@ class SimulationRequest(BaseModel):
     atk_bonus: int = Field(default=5, ge=0, le=20)
     def_bonus: int = Field(default=5, ge=0, le=20)
     sta_bonus: int = Field(default=5, ge=0, le=20)
-    provider: str = "gemini"
+    provider: str = "ollama"
     api_key: Optional[str] = None
     model: Optional[str] = None
 
