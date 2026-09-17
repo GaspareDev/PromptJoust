@@ -15,8 +15,8 @@
 
 In traditional RPGs, you control your character with buttons and menus. In **PromptJoust**, you act as the **Tactician**:
 
-1. **Craft a Strategy**: Write a natural language tactical directive for your hero (up to 280 characters).
-2. **Allocate Stat Points**: Distribute a pool of 20 bonus points across Health (HP), Attack (ATK), Defense (DEF), and Stamina (STA).
+1. **Craft a Strategy**: Write a natural language tactical directive for your hero (up to 200–280 characters depending on difficulty).
+2. **Allocate Stat Points**: Distribute a pool of bonus points (15 to 25 pts) across Health (HP), Attack (ATK), Defense (DEF), and Stamina (STA).
 3. **Face Unique Bosses**: Each boss has distinct lore, hidden weaknesses, and dynamic behavioral routines.
 4. **AI Referee Arbitration**: A Large Language Model (Google Gemini, Anthropic Claude, OpenAI, Groq, or local Ollama) acts as the sandboxed arena referee. It interprets both fighters' intents turn-by-turn into structured JSON decisions.
 5. **Deterministic Combat Engine**: A pure Python combat rules engine resolves all damage, stamina economy, guard breaks, dodge counters, and status effects.
@@ -27,6 +27,7 @@ No fluff, no conversational drift—just pure tactical prompt engineering and de
 
 ## 🌟 Key Features
 
+- **Tournament Difficulty Tiers**: Three calibrated difficulty ranks—**🌱 Apprentice** (25 stat pts, 280 runes, softened boss), **⚔️ Warrior** (standard tournament baseline: 20 stat pts, 280 runes, 100% boss stats), and **💀 Grandmaster** (15 stat pts, strict 200 runes, empowered boss with +15% HP/ATK/DEF and accelerated stamina recovery).
 - **Multi-Model Support**: Play using cloud LLMs (**Google Gemini Flash**, **Anthropic Claude**, **OpenAI `gpt-4o-mini`**, **Groq `llama-3.3`**) or run **100% offline & free** using a local **Ollama** instance.
 
 - **Strict JSON Structured Outputs**: The referee outputs schema-enforced actions without markdown clutter or hallucinations.
@@ -98,7 +99,21 @@ Matches last **up to 10 rounds** with alternating initiative:
 - `DODGE`: $15\text{ STA}$
 - `DEFEND`: $5\text{ STA}$ (recovers $+10\text{ STA}$)
 - `PSYCH_WARFARE`: $10\text{ STA}$
-- **Natural Recovery**: Every fighter recovers $+5\text{ STA}$ at the end of each round. Running out of stamina downgrades moves to basic attacks.
+- **Natural Recovery**: Every fighter recovers $+5\text{ STA}$ at the end of each round (except Grandmaster bosses who recover $+8\text{ STA}$). Running out of stamina downgrades moves to basic attacks.
+
+### 🏆 Tournament Difficulties
+
+Choose your tier before launching into the arena:
+
+| Tier | Hero Valor Pool | Prompt Limit | Boss Stat Scaling | Boss Stamina Recovery |
+| :--- | :---: | :---: | :---: | :---: |
+| **🌱 Apprentice** | $25\text{ pts}$ | $280\text{ runes}$ | $85\%$ HP / ATK / DEF | $+5\text{ STA/round}$ |
+| **⚔️ Warrior** (Standard) | $20\text{ pts}$ | $280\text{ runes}$ | $100\%$ HP / ATK / DEF | $+5\text{ STA/round}$ |
+| **💀 Grandmaster** | $15\text{ pts}$ | $200\text{ runes}$ | $115\%$ HP / ATK / DEF | $+8\text{ STA/round}$ |
+
+- **Apprentice**: Forgiving entry tier. Extra stat points and softened boss parameters allow experimenting with tactics and prompts.
+- **Warrior**: The canonical competitive tournament experience. Balanced point budget and unmodified boss stats.
+- **Grandmaster**: High-stakes trial. Tighter prompt budget demanding surgical prompt engineering, scarce stats, and an aggressive, rapidly-recovering boss.
 
 ---
 
@@ -187,16 +202,19 @@ Creating a new boss is as simple as dropping a `.json` file into `content/bosses
 
 ---
 
-## 🧪 Running Tests
+## 🧪 Running Tests & Architecture
 
-PromptJoust includes a comprehensive unit test suite (88/88 passing, 100% statement coverage across all core, provider, and interface modules):
+PromptJoust includes a comprehensive unit test suite (114/114 passing, 100% statement coverage across all 19 modules including `models`, `core`, `providers`, and `interfaces`):
+
+- **Real-time Streaming**: Supports Server-Sent Events (`POST /api/simulate/stream`) for immediate round-by-round combat streaming and sub-second UI updates without waiting for full match completion.
+- **Async Engine**: Non-blocking asynchronous match loop (`engine.stream_match()` and `engine.run_match_async()`) powered by `httpx.AsyncClient` across Gemini, Claude, OpenAI, Groq, and Ollama.
 
 ```bash
 # Run all tests
 python -m pytest
 
 # Run tests with strict coverage report
-python -m pytest --cov=core --cov=providers --cov=interfaces tests/
+python -m pytest --cov=models --cov=core --cov=providers --cov=interfaces --cov-report=term-missing tests/
 ```
 
 ---

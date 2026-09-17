@@ -10,8 +10,8 @@ Responsible for:
 from __future__ import annotations
 
 import re
-from typing import Tuple, Dict, Any
-from .types import FighterStats
+from typing import Tuple, Dict, Any, Optional
+from models import FighterStats, DifficultyLevel, DIFFICULTY_CONFIGS
 
 MAX_PROMPT_LENGTH = 280
 EXTRA_ATTRIBUTE_POINTS = 20
@@ -29,27 +29,37 @@ class SanitizationError(ValueError):
     pass
 
 
-def sanitize_tactical_prompt(prompt: str) -> str:
+def sanitize_tactical_prompt(
+    prompt: Optional[str],
+    max_length: Optional[int] = None,
+    difficulty: Optional[DifficultyLevel] = None,
+    allow_empty: bool = False,
+) -> str:
     """
     Sanitizes user tactical directives before passing them to the referee engine.
 
     Actions performed:
     - Strips leading and trailing whitespace
-    - Ensures non-empty content and length <= 280 characters
+    - Ensures non-empty content (unless allow_empty=True) and length <= allowed limit
     - Neutralizes raw XML tags (e.g. `<untrusted_entity>`, `<system>`)
     - Filters non-printable control characters while preserving standard whitespace
     """
-    if not prompt or not isinstance(prompt, str):
+    if prompt is None or not isinstance(prompt, str) or len(prompt.strip()) == 0:
+        if allow_empty:
+            return ""
         raise SanitizationError("Tactical directive cannot be empty.")
 
     cleaned = prompt.strip()
 
-    if len(cleaned) == 0:
-        raise SanitizationError("Tactical directive cannot be empty.")
+    limit = max_length
+    if limit is None and difficulty is not None and difficulty in DIFFICULTY_CONFIGS:
+        limit = DIFFICULTY_CONFIGS[difficulty].max_prompt_length
+    if limit is None:
+        limit = MAX_PROMPT_LENGTH
 
-    if len(cleaned) > MAX_PROMPT_LENGTH:
+    if len(cleaned) > limit:
         raise SanitizationError(
-            f"Tactical prompt exceeds maximum character limit of {MAX_PROMPT_LENGTH} (received {len(cleaned)} chars)."
+            f"Tactical prompt exceeds maximum character limit of {limit} (received {len(cleaned)} chars)."
         )
 
     # Neutralize XML entity tags that could interfere with boundary tagging
@@ -67,15 +77,17 @@ def validate_and_allocate_stats(
     atk_bonus: int = 0,
     def_bonus: int = 0,
     sta_bonus: int = 0,
+    difficulty: DifficultyLevel = DifficultyLevel.WARRIOR,
 ) -> FighterStats:
     """
-    Validates and allocates the 20 bonus attribute points to base hero statistics.
+    Validates and allocates the bonus attribute points to base hero statistics according to the difficulty tier.
 
     Args:
         hp_bonus: Points allocated to Health (+2 HP per point).
         atk_bonus: Points allocated to Attack (+1 ATK per point).
         def_bonus: Points allocated to Defense (+1 DEF per point).
         sta_bonus: Points allocated to Stamina (+1 STA per point).
+        difficulty: DifficultyLevel tier determining available valor points (default: WARRIOR = 20).
 
     Returns:
         FighterStats initialized with final computed values.
@@ -84,11 +96,15 @@ def validate_and_allocate_stats(
         if not isinstance(val, int) or val < 0:
             raise SanitizationError(f"Attribute bonus '{name}' must be a non-negative integer.")
 
+    diff_config = DIFFICULTY_CONFIGS.get(difficulty, DIFFICULTY_CONFIGS[DifficultyLevel.WARRIOR])
+    expected_points = diff_config.valor_points
+
     total_spent = hp_bonus + atk_bonus + def_bonus + sta_bonus
-    if total_spent != EXTRA_ATTRIBUTE_POINTS:
+    if total_spent != expected_points:
         raise SanitizationError(
-            f"You must allocate exactly {EXTRA_ATTRIBUTE_POINTS} bonus points (allocated: {total_spent})."
+            f"You must allocate exactly {expected_points} bonus points (allocated: {total_spent})."
         )
+
 
     # Calculate final stats (HP gets +2 per bonus point for balanced scaling if desired, or 1:1)
     # 1:1 standard allocation

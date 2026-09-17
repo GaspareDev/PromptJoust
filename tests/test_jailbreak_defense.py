@@ -12,9 +12,10 @@ from core.referee import (
     detect_jailbreak_keywords,
     build_round_prompt,
 )
-from core.types import FighterStats, FighterState, BossData, ActionType
+from core.types import FighterStats, FighterState, BossData, ActionType, DifficultyLevel
 from core.engine import MatchEngine
 from tests.test_helpers import DummyTestProvider as MockProvider
+
 
 
 def test_prompt_length_validation():
@@ -28,6 +29,13 @@ def test_prompt_length_validation():
 def test_empty_prompt_validation():
     with pytest.raises(SanitizationError, match="cannot be empty"):
         sanitize_tactical_prompt("   ")
+
+    with pytest.raises(SanitizationError, match="cannot be empty"):
+        sanitize_tactical_prompt("", allow_empty=False)
+
+    assert sanitize_tactical_prompt("   ", allow_empty=True) == ""
+    assert sanitize_tactical_prompt("", allow_empty=True) == ""
+    assert sanitize_tactical_prompt(None, allow_empty=True) == ""
 
 
 def test_xml_tag_neutralization():
@@ -119,3 +127,36 @@ def test_match_engine_neutralizes_jailbreak_attempt():
     assert first_round.turn_decision.hero_intent.action == ActionType.CONFUSED
     assert first_round.hero_resolution.action == ActionType.CONFUSED
     assert first_round.hero_resolution.damage_dealt == 0
+
+
+def test_difficulty_prompt_length_constraints():
+    # Grandmaster limit is 200 chars
+    valid_gm = "A" * 200
+    assert len(sanitize_tactical_prompt(valid_gm, difficulty=DifficultyLevel.GRANDMASTER)) == 200
+
+    with pytest.raises(SanitizationError, match="maximum character limit of 200"):
+        sanitize_tactical_prompt("A" * 201, difficulty=DifficultyLevel.GRANDMASTER)
+
+    # Apprentice limit is 280 chars
+    valid_app = "B" * 280
+    assert len(sanitize_tactical_prompt(valid_app, difficulty=DifficultyLevel.APPRENTICE)) == 280
+
+    with pytest.raises(SanitizationError, match="maximum character limit of 280"):
+        sanitize_tactical_prompt("B" * 281, difficulty=DifficultyLevel.APPRENTICE)
+
+
+def test_difficulty_stat_points_allocations():
+    # Apprentice requires 25 points
+    with pytest.raises(SanitizationError, match="allocate exactly 25 bonus points"):
+        validate_and_allocate_stats(hp_bonus=5, atk_bonus=5, def_bonus=5, sta_bonus=5, difficulty=DifficultyLevel.APPRENTICE)
+
+    stats_app = validate_and_allocate_stats(hp_bonus=10, atk_bonus=5, def_bonus=5, sta_bonus=5, difficulty=DifficultyLevel.APPRENTICE)
+    assert stats_app.hp == 120  # 100 + 10*2
+
+    # Grandmaster requires 15 points
+    with pytest.raises(SanitizationError, match="allocate exactly 15 bonus points"):
+        validate_and_allocate_stats(hp_bonus=5, atk_bonus=5, def_bonus=5, sta_bonus=5, difficulty=DifficultyLevel.GRANDMASTER)
+
+    stats_gm = validate_and_allocate_stats(hp_bonus=5, atk_bonus=5, def_bonus=5, sta_bonus=0, difficulty=DifficultyLevel.GRANDMASTER)
+    assert stats_gm.hp == 110  # 100 + 5*2
+

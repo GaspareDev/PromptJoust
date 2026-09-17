@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Union
-from core.types import TurnDecision
+from models import TurnDecision
 
 
 class BaseLLMProvider(ABC):
@@ -37,3 +37,21 @@ class BaseLLMProvider(ABC):
             JSON string or TurnDecision instance representing the round's decision.
         """
         pass
+
+    async def generate_turn_decision_async(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        schema: Dict[str, Any],
+    ) -> Union[str, TurnDecision]:
+        """
+        Asynchronous variant of generate_turn_decision.
+        Defaults to executing generate_turn_decision in an asyncio threadpool worker.
+        """
+        import asyncio
+        return await asyncio.to_thread(
+            self.generate_turn_decision,
+            system_prompt,
+            user_prompt,
+            schema,
+        )

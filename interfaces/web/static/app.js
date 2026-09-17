@@ -15,15 +15,71 @@ let currentSimulation = null;
 let currentRoundIndex = 0;
 let autoPlayInterval = null;
 
-// Baseline hero stats and pool limit
+// Baseline hero stats and difficulty configuration
 const BASE_HERO = { hp: 100, atk: 15, def: 10, sta: 50 };
-const TOTAL_BONUS_POOL = 20;
+
+const DIFFICULTY_PRESETS = {
+  apprentice: { name: "Apprentice", pool: 25, maxPrompt: 280, defaultPreset: [6, 7, 6, 6] },
+  warrior: { name: "Warrior", pool: 20, maxPrompt: 280, defaultPreset: [5, 5, 5, 5] },
+  grandmaster: { name: "Grandmaster", pool: 15, maxPrompt: 200, defaultPreset: [4, 4, 4, 3] },
+};
+
+let currentDifficulty = "warrior";
+let totalBonusPool = 20;
+let maxPromptLength = 280;
+
+/**
+ * Switches the active tournament difficulty tier and adjusts the valor pool and limits.
+ * @param {string} diff - Difficulty tier key ('apprentice', 'warrior', 'grandmaster').
+ */
+function selectDifficulty(diff) {
+  if (!DIFFICULTY_PRESETS[diff]) return;
+  currentDifficulty = diff;
+  const cfg = DIFFICULTY_PRESETS[diff];
+  totalBonusPool = cfg.pool;
+  maxPromptLength = cfg.maxPrompt;
+
+  document.querySelectorAll(".difficulty-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.diff === diff);
+  });
+
+  const maxPoolEl = document.getElementById("max-valor-pool");
+  if (maxPoolEl) maxPoolEl.textContent = totalBonusPool;
+
+  const promptLimitText = document.getElementById("prompt-limit-text");
+  if (promptLimitText) promptLimitText.textContent = maxPromptLength;
+
+  ["hp", "atk", "def", "sta"].forEach(stat => {
+    const el = document.getElementById(`slider-${stat}`);
+    if (el) el.max = totalBonusPool;
+  });
+
+  const hp = parseInt(document.getElementById("slider-hp").value) || 0;
+  const atk = parseInt(document.getElementById("slider-atk").value) || 0;
+  const def = parseInt(document.getElementById("slider-def").value) || 0;
+  const sta = parseInt(document.getElementById("slider-sta").value) || 0;
+  if (hp + atk + def + sta > totalBonusPool) {
+    applyPreset(...cfg.defaultPreset);
+  } else {
+    updateAllocations();
+  }
+
+  const promptInput = document.getElementById("tactical-prompt");
+  if (promptInput) {
+    handlePromptInput({ target: promptInput });
+  }
+}
+
+// Explicitly register on window object for inline HTML onclick handlers
+window.selectDifficulty = selectDifficulty;
+window.applyPreset = applyPreset;
 
 document.addEventListener("DOMContentLoaded", () => {
   initUI();
   fetchBosses();
   fetchProviders();
 });
+
 
 /**
  * Attaches event listeners to all interactive UI controls.
@@ -33,6 +89,14 @@ function initUI() {
   sliders.forEach(stat => {
     const el = document.getElementById(`slider-${stat}`);
     el.addEventListener("input", () => handleSliderChange(stat));
+  });
+
+  // Tournament difficulty chips event listener
+  document.querySelectorAll(".difficulty-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const diff = e.currentTarget.dataset.diff;
+      if (diff) selectDifficulty(diff);
+    });
   });
 
   const promptInput = document.getElementById("tactical-prompt");
@@ -56,6 +120,12 @@ function initUI() {
   document.getElementById("export-replay-btn").addEventListener("click", exportReplay);
   document.getElementById("share-replay-btn").addEventListener("click", generateShareableLink);
   document.getElementById("replay-file-input").addEventListener("change", handleImportReplay);
+  const importReplayBtn = document.getElementById("import-replay-btn");
+  if (importReplayBtn) {
+    importReplayBtn.addEventListener("click", () => {
+      document.getElementById("replay-file-input").click();
+    });
+  }
   const closeDecreeBtn = document.getElementById("close-decree-btn");
   if (closeDecreeBtn) closeDecreeBtn.addEventListener("click", closeDecree);
 
@@ -131,8 +201,8 @@ function handleSliderChange(changedStat) {
   let sta = parseInt(document.getElementById("slider-sta").value) || 0;
 
   let total = hp + atk + def + sta;
-  if (total > TOTAL_BONUS_POOL) {
-    const overflow = total - TOTAL_BONUS_POOL;
+  if (total > totalBonusPool) {
+    const overflow = total - totalBonusPool;
     const changedEl = document.getElementById(`slider-${changedStat}`);
     changedEl.value = Math.max(0, parseInt(changedEl.value) - overflow);
   }
@@ -149,7 +219,7 @@ function updateAllocations() {
   const sta = parseInt(document.getElementById("slider-sta").value) || 0;
 
   const total = hp + atk + def + sta;
-  const remaining = TOTAL_BONUS_POOL - total;
+  const remaining = totalBonusPool - total;
 
   document.getElementById("remaining-points").textContent = remaining;
   document.getElementById("hp-val").textContent = hp;
@@ -167,14 +237,15 @@ function handlePromptInput(e) {
   const text = e.target.value;
   const len = text.length;
   const counter = document.getElementById("char-counter");
-  counter.textContent = `${len} / 280`;
+  counter.textContent = `${len} / ${maxPromptLength}`;
 
-  if (len > 280) {
+  if (len > maxPromptLength) {
     counter.className = "char-warn";
   } else {
     counter.className = "char-ok";
   }
 }
+
 
 async function fetchBosses() {
   try {
@@ -296,12 +367,11 @@ function hideLoadingScreen() {
 }
 
 /**
- * Sends combat simulation payload to the FastAPI backend and opens the Grand Arena.
+ * Sends combat simulation payload to the FastAPI backend and streams rounds via SSE.
  */
 async function startSimulation() {
   const bossId = document.getElementById("boss-select").value;
-  const prompt = document.getElementById("tactical-prompt").value.trim() || 
-    "Execute fast strikes to break defense. Taunt with NullPointer errors.";
+  const prompt = document.getElementById("tactical-prompt").value.trim();
   const provider = document.getElementById("provider-select").value;
 
   const hp = parseInt(document.getElementById("slider-hp").value) || 0;
@@ -310,8 +380,8 @@ async function startSimulation() {
   const sta = parseInt(document.getElementById("slider-sta").value) || 0;
 
   const total = hp + atk + def + sta;
-  if (total !== TOTAL_BONUS_POOL) {
-    alert(`Please allocate all ${TOTAL_BONUS_POOL} valor points (currently allocated: ${total}).`);
+  if (total !== totalBonusPool) {
+    alert(`Please allocate all ${totalBonusPool} valor points (currently allocated: ${total}).`);
     return;
   }
 
@@ -321,32 +391,132 @@ async function startSimulation() {
 
   showLoadingScreen();
 
+  const payload = {
+    boss_id: bossId,
+    tactical_prompt: prompt,
+    hp_bonus: hp,
+    atk_bonus: atk,
+    def_bonus: def,
+    sta_bonus: sta,
+    difficulty: currentDifficulty,
+    provider: provider,
+  };
+
+  currentSimulation = {
+    winner: null,
+    total_rounds: 0,
+    hero_final_hp: 100,
+    boss_final_hp: 100,
+    rounds_log: [],
+    victory_reason: "",
+    difficulty: currentDifficulty,
+    isComplete: false,
+  };
+
   try {
-    const res = await fetch("/api/simulate", {
+    const res = await fetch("/api/simulate/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        boss_id: bossId,
-        tactical_prompt: prompt,
-        hp_bonus: hp,
-        atk_bonus: atk,
-        def_bonus: def,
-        sta_bonus: sta,
-        provider: provider,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || "Simulation failed");
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Simulation stream failed");
     }
 
-    currentSimulation = await res.json();
-    hideLoadingScreen();
-    openArena();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let arenaOpened = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const blocks = buffer.split("\n\n");
+      buffer = blocks.pop() || "";
+
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        let eventType = "message";
+        let eventData = "";
+
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event:")) {
+            eventType = line.replace("event:", "").trim();
+          } else if (line.startsWith("data:")) {
+            eventData = line.replace("data:", "").trim();
+          }
+        }
+
+        if (!eventData) continue;
+
+        try {
+          const parsed = JSON.parse(eventData);
+
+          if (eventType === "init") {
+            if (!arenaOpened) {
+              hideLoadingScreen();
+              openArena();
+              arenaOpened = true;
+            }
+          } else if (eventType === "round") {
+            if (!arenaOpened) {
+              hideLoadingScreen();
+              openArena();
+              arenaOpened = true;
+            }
+            currentSimulation.rounds_log.push(parsed);
+            currentSimulation.total_rounds = currentSimulation.rounds_log.length;
+            currentRoundIndex = currentSimulation.rounds_log.length - 1;
+            renderArenaRound(currentRoundIndex);
+          } else if (eventType === "complete") {
+            currentSimulation.winner = parsed.winner;
+            currentSimulation.total_rounds = parsed.total_rounds;
+            currentSimulation.hero_final_hp = parsed.hero_final_hp;
+            currentSimulation.boss_final_hp = parsed.boss_final_hp;
+            currentSimulation.victory_reason = parsed.victory_reason;
+            currentSimulation.difficulty = parsed.difficulty || currentDifficulty;
+            if (parsed.rounds_log && parsed.rounds_log.length > currentSimulation.rounds_log.length) {
+              currentSimulation.rounds_log = parsed.rounds_log;
+            }
+            currentSimulation.isComplete = true;
+            if (!arenaOpened) {
+              hideLoadingScreen();
+              openArena();
+              arenaOpened = true;
+            }
+            currentRoundIndex = currentSimulation.rounds_log.length - 1;
+            renderArenaRound(currentRoundIndex);
+          }
+        } catch (jsonErr) {
+          console.warn("Failed to parse SSE event data:", jsonErr, eventData);
+        }
+      }
+    }
   } catch (err) {
-    hideLoadingScreen();
-    alert(`Error: ${err.message}`);
+    console.warn("Streaming failed, falling back to batch simulation:", err);
+    try {
+      const fallbackRes = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!fallbackRes.ok) {
+        const fbErr = await fallbackRes.json().catch(() => ({}));
+        throw new Error(fbErr.detail || "Batch simulation failed");
+      }
+      currentSimulation = await fallbackRes.json();
+      currentSimulation.isComplete = true;
+      hideLoadingScreen();
+      openArena();
+      startAutoPlay();
+    } catch (fbErr) {
+      hideLoadingScreen();
+      alert(`Simulation Error: ${fbErr.message}`);
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = "⚔️ COMMENCE THE GRAND JOUST (10 ROUNDS)";
@@ -372,7 +542,6 @@ function openArena() {
 
   currentRoundIndex = 0;
   renderArenaRound(currentRoundIndex);
-  startAutoPlay();
 }
 
 /**
@@ -545,7 +714,7 @@ function renderArenaRound(idx) {
 
   // Verdict Banner & Decree Modal if last round
   const verdictBanner = document.getElementById("final-verdict-banner");
-  if (idx === currentSimulation.rounds_log.length - 1) {
+  if (currentSimulation.isComplete && idx === currentSimulation.rounds_log.length - 1) {
     verdictBanner.classList.remove("hidden");
     if (currentSimulation.winner === "Hero") {
       verdictBanner.className = "verdict-banner win";
@@ -600,7 +769,13 @@ function showDecreeModal(sim) {
   heroHp.textContent = `${sim.hero_final_hp} HP`;
   bossHp.textContent = `${sim.boss_final_hp} HP`;
 
+  const diffEl = document.getElementById("decree-difficulty");
+  if (diffEl) {
+    diffEl.textContent = (sim.difficulty || currentDifficulty || "warrior").toUpperCase();
+  }
+
   overlay.classList.remove("hidden");
+
 }
 
 /**

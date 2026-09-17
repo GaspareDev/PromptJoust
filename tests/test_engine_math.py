@@ -37,10 +37,11 @@ def make_decision(hero_act: ActionType, boss_act: ActionType, hero_psych: bool =
 
 
 def test_calculate_base_damage():
-    # max(5, ATK - DEF)
-    assert calculate_base_damage(20, 10) == 10
-    assert calculate_base_damage(20, 25) == 5  # Floor is 5
-    assert calculate_base_damage(15, 15) == 5
+    # max(10, ceil(ATK * 1.2 - DEF * 0.5))
+    assert calculate_base_damage(20, 10) == 19
+    assert calculate_base_damage(20, 25) == 12  # ceil(24 - 12.5) = 12
+    assert calculate_base_damage(15, 15) == 11  # ceil(18 - 7.5) = 11
+    assert calculate_base_damage(10, 30) == 10  # Floor is 10
 
 
 def test_attack_vs_attack():
@@ -50,10 +51,10 @@ def test_attack_vs_attack():
     decision = make_decision(ActionType.ATTACK, ActionType.ATTACK)
     hero_res, boss_res, events, hero_next_status, boss_next_status = resolve_round_actions(hero_state, boss_state, decision)
 
-    # Hero deals 20 - 12 = 8 dmg
-    assert hero_res.damage_dealt == 8
-    # Boss deals 25 - 10 = 15 dmg
-    assert boss_res.damage_dealt == 15
+    # Hero deals ceil(20 * 1.2 - 12 * 0.5) = 18 dmg
+    assert hero_res.damage_dealt == 18
+    # Boss deals ceil(25 * 1.2 - 10 * 0.5) = 25 dmg
+    assert boss_res.damage_dealt == 25
     assert hero_res.stamina_spent == 0
     assert boss_res.stamina_spent == 0
 
@@ -65,8 +66,8 @@ def test_attack_vs_defend():
     decision = make_decision(ActionType.ATTACK, ActionType.DEFEND)
     hero_res, boss_res, events, hero_next_status, boss_next_status = resolve_round_actions(hero_state, boss_state, decision)
 
-    # Raw base = 20 - 12 = 8 dmg. DEFEND reduces by 60% -> deals ceil(8 * 0.40) = 4 dmg
-    assert hero_res.damage_dealt == 4
+    # Raw base = 18 dmg. DEFEND reduces to ceil(18 * 0.35) = 7 dmg
+    assert hero_res.damage_dealt == 7
     assert boss_res.damage_dealt == 0
     assert boss_res.stamina_recovered == 10
     assert boss_res.stamina_spent == 5
@@ -79,8 +80,8 @@ def test_heavy_attack_vs_defend_guard_break():
     decision = make_decision(ActionType.HEAVY_ATTACK, ActionType.DEFEND)
     hero_res, boss_res, events, hero_next_status, boss_next_status = resolve_round_actions(hero_state, boss_state, decision)
 
-    # Guard break: deals 1.2 * ATK = 24 dmg
-    assert hero_res.damage_dealt == 24
+    # Guard break: deals ceil(1.5 * ATK) = 30 dmg
+    assert hero_res.damage_dealt == 30
     assert boss_res.damage_dealt == 0
     assert hero_res.stamina_spent == 25
     assert hero_res.status_inflicted == StatusEffect.STAGGERED
@@ -94,9 +95,9 @@ def test_heavy_attack_vs_dodge_counter():
     decision = make_decision(ActionType.HEAVY_ATTACK, ActionType.DODGE)
     hero_res, boss_res, events, hero_next_status, boss_next_status = resolve_round_actions(hero_state, boss_state, decision)
 
-    # Heavy attack whiffs completely; dodger counters for 20 deterministic dmg
+    # Heavy attack whiffs completely; dodger counters for 25 deterministic dmg
     assert hero_res.damage_dealt == 0
-    assert boss_res.damage_dealt == 20
+    assert boss_res.damage_dealt == 25
     assert hero_res.stamina_spent == 25
     assert boss_res.stamina_spent == 15
 
@@ -108,8 +109,8 @@ def test_attack_vs_dodge():
     decision = make_decision(ActionType.ATTACK, ActionType.DODGE)
     hero_res, boss_res, events, hero_next_status, boss_next_status = resolve_round_actions(hero_state, boss_state, decision)
 
-    # Dodge fails against quick attack; hero deals full base dmg (8 dmg)
-    assert hero_res.damage_dealt == 8
+    # Dodge fails against quick attack; hero deals full base dmg (18 dmg)
+    assert hero_res.damage_dealt == 18
     assert boss_res.damage_dealt == 0
     assert boss_res.stamina_spent == 15
 
@@ -125,8 +126,8 @@ def test_psych_warfare_vs_attack():
     assert hero_res.damage_dealt == 0
     assert hero_res.status_inflicted == StatusEffect.STAGGERED
     assert boss_next_status == StatusEffect.STAGGERED
-    # Boss deals full base damage (15 dmg)
-    assert boss_res.damage_dealt == 15
+    # Boss deals full base damage (25 dmg)
+    assert boss_res.damage_dealt == 25
 
 
 def test_stamina_exhaustion_downgrade():

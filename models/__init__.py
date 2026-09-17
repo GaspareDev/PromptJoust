@@ -1,8 +1,8 @@
 """
-PromptJoust Data Types & Domain Models (Backward Compatibility Shim).
+PromptJoust Data Models, Enums, and Schemas Package.
 
-All models and enumerations have been reorganized into the top-level `models` package.
-This module re-exports all types to maintain seamless backward compatibility.
+Centralizes all domain entities, combat math structures,
+and web API validation models across the application.
 """
 
 from models.enums import ActionType, StatusEffect, DifficultyLevel

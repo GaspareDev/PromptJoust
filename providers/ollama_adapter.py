@@ -11,7 +11,7 @@ import os
 import json
 from typing import Dict, Any, Optional, Union
 import requests
-from core.types import TurnDecision
+from models import TurnDecision
 from core.config import settings
 from .base import BaseLLMProvider
 
@@ -53,7 +53,7 @@ class OllamaProvider(BaseLLMProvider):
             "keep_alive": "15m",
             "options": {
                 "temperature": 0.1,
-                "num_predict": 180,
+                "num_predict": 256,
                 "num_ctx": 1024,
                 "top_k": 20,
                 "top_p": 0.85,
@@ -66,6 +66,47 @@ class OllamaProvider(BaseLLMProvider):
             data = resp.json()
             return data["message"]["content"]
         except requests.RequestException as exc:
+            raise ConnectionError(
+                f"Failed to communicate with local Ollama server at {self.host}. "
+                f"Is Ollama running (`ollama serve`) and is '{self.model}' installed (`ollama pull {self.model}`)? Details: {exc}"
+            ) from exc
+
+    async def generate_turn_decision_async(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        schema: Dict[str, Any],
+    ) -> Union[str, TurnDecision]:
+        import httpx
+        url = f"{self.host.rstrip('/')}/api/chat"
+        min_schema = json.dumps(schema, separators=(',', ':'))
+        system_with_schema = f"{system_prompt}\n\nSTRICT REQUIREMENT: Output must strictly validate against this JSON Schema:\n{min_schema}"
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_with_schema},
+                {"role": "user", "content": user_prompt},
+            ],
+            "format": "json",
+            "stream": False,
+            "keep_alive": "15m",
+            "options": {
+                "temperature": 0.1,
+                "num_predict": 256,
+                "num_ctx": 1024,
+                "top_k": 20,
+                "top_p": 0.85,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["message"]["content"]
+        except Exception as exc:
             raise ConnectionError(
                 f"Failed to communicate with local Ollama server at {self.host}. "
                 f"Is Ollama running (`ollama serve`) and is '{self.model}' installed (`ollama pull {self.model}`)? Details: {exc}"

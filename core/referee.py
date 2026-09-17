@@ -15,7 +15,7 @@ import re
 from typing import Dict, Any, Optional
 from pydantic import ValidationError
 
-from .types import (
+from models import (
     TurnDecision,
     HeroIntent,
     BossIntent,
@@ -23,6 +23,7 @@ from .types import (
     ActionType,
     FighterState,
     StatusEffect,
+    BossData,
 )
 from .sanitizer import sanitize_tactical_prompt
 
@@ -123,7 +124,7 @@ def build_round_prompt(
     Returns:
         Structured text prompt formatted for the referee LLM.
     """
-    clean_hero_prompt = sanitize_tactical_prompt(hero_prompt)
+    clean_hero_prompt = sanitize_tactical_prompt(hero_prompt, allow_empty=True) or "[NO TACTICAL DIRECTIVES ENTERED - FIGHTER HAS NO ORDERS]"
     phase = "HERO_ATTACK" if round_number % 2 == 1 else "BOSS_ATTACK"
 
     return f"""[ROUND {round_number} STATE - PHASE: {phase}]
@@ -185,57 +186,94 @@ def parse_and_validate_turn_decision(raw_output: str, expected_round: int) -> Tu
     try:
         data = json.loads(cleaned)
     except Exception as e:
+        data = None
         # Fallback to extracting JSON object via regex if there's surrounding text
         match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
         if match:
             try:
                 data = json.loads(match.group(1))
             except Exception:
+                data = None
+
+        # If data is still None, attempt auto-repair for truncated output
+        if data is None:
+            for suffix in ["}", "}}", "}}}", '"}}', '"}}}', '"]}}', '}]}}']:
+                try:
+                    data = json.loads(cleaned + suffix)
+                    break
+                except Exception:
+                    pass
+
+        if data is None:
+            if match:
                 raise ValueError(f"Failed to parse JSON from referee output: {raw_output[:200]}") from e
-        else:
-            raise ValueError(f"No valid JSON found in referee response: {raw_output[:200]}") from e
+            else:
+                raise ValueError(f"No valid JSON found in referee response: {raw_output[:200]}") from e
 
     # Force round number consistency
     data["round_number"] = expected_round
+    is_odd = (expected_round % 2 == 1)
 
-    # Defensively clamp string lengths and ensure non-empty banter
-    if isinstance(data.get("hero_intent"), dict):
-        hero_act = str(data["hero_intent"].get("action", "ATTACK")).upper()
-        reason = str(data["hero_intent"].get("tactical_reasoning", "")).lower()
+    # Ensure hero_intent exists and conforms to schema
+    if not isinstance(data.get("hero_intent"), dict):
+        data["hero_intent"] = {
+            "action": "ATTACK" if is_odd else "DEFEND",
+            "banter": "Forward!" if is_odd else "Bracing guard!",
+            "tactical_reasoning": "Standard turn action.",
+        }
 
-        # Reconcile action with reasoning if LLM hallucinated action inconsistency
-        if expected_round % 2 == 1:
-            if hero_act == "HEAVY_ATTACK" and any(k in reason for k in ["swift", "precision", "rapid", "quick", "standard"]):
-                hero_act = "ATTACK"
-                data["hero_intent"]["action"] = "ATTACK"
-        else:
-            if hero_act == "DEFEND" and any(k in reason for k in ["dodge", "evade", "sidestep", "elude"]):
-                hero_act = "DODGE"
-                data["hero_intent"]["action"] = "DODGE"
+    hero_act = str(data["hero_intent"].get("action", "ATTACK" if is_odd else "DEFEND")).upper()
+    reason = str(data["hero_intent"].get("tactical_reasoning", "")).lower()
 
-        if not data["hero_intent"].get("banter") or str(data["hero_intent"]["banter"]).strip() in ('""', "''", ""):
-            data["hero_intent"]["banter"] = ACTION_DEFAULT_BANTERS.get(hero_act, "Engaging target!")
-        else:
-            data["hero_intent"]["banter"] = str(data["hero_intent"]["banter"]).strip()[:100]
+    # Reconcile action with reasoning if LLM hallucinated action inconsistency
+    if is_odd:
+        if hero_act == "HEAVY_ATTACK" and any(k in reason for k in ["swift", "precision", "rapid", "quick", "standard"]):
+            hero_act = "ATTACK"
+            data["hero_intent"]["action"] = "ATTACK"
+    else:
+        if hero_act == "DEFEND" and any(k in reason for k in ["dodge", "evade", "sidestep", "elude"]):
+            hero_act = "DODGE"
+            data["hero_intent"]["action"] = "DODGE"
 
-        if "tactical_reasoning" in data["hero_intent"] and isinstance(data["hero_intent"]["tactical_reasoning"], str):
-            data["hero_intent"]["tactical_reasoning"] = data["hero_intent"]["tactical_reasoning"][:150]
+    if not data["hero_intent"].get("banter") or str(data["hero_intent"]["banter"]).strip() in ('""', "''", ""):
+        data["hero_intent"]["banter"] = ACTION_DEFAULT_BANTERS.get(hero_act, "Engaging target!")
+    else:
+        data["hero_intent"]["banter"] = str(data["hero_intent"]["banter"]).strip()[:100]
 
-    if isinstance(data.get("boss_intent"), dict):
-        boss_act = str(data["boss_intent"].get("action", "ATTACK")).upper()
-        if not data["boss_intent"].get("banter") or str(data["boss_intent"]["banter"]).strip() in ('""', "''", ""):
-            data["boss_intent"]["banter"] = ACTION_DEFAULT_BANTERS.get(boss_act, "Executing routine!")
-        else:
-            data["boss_intent"]["banter"] = str(data["boss_intent"]["banter"]).strip()[:100]
+    if "tactical_reasoning" in data["hero_intent"] and isinstance(data["hero_intent"]["tactical_reasoning"], str):
+        data["hero_intent"]["tactical_reasoning"] = data["hero_intent"]["tactical_reasoning"][:150]
 
-        if "tactical_reasoning" in data["boss_intent"] and isinstance(data["boss_intent"]["tactical_reasoning"], str):
-            data["boss_intent"]["tactical_reasoning"] = data["boss_intent"]["tactical_reasoning"][:150]
+    # Ensure boss_intent exists and conforms to schema
+    if not isinstance(data.get("boss_intent"), dict):
+        data["boss_intent"] = {
+            "action": "DEFEND" if is_odd else "ATTACK",
+            "banter": "Hold the line!" if is_odd else "Annihilate!",
+            "tactical_reasoning": "Standard boss action.",
+        }
 
-    if isinstance(data.get("psych_warfare_eval"), dict):
+    boss_act = str(data["boss_intent"].get("action", "DEFEND" if is_odd else "ATTACK")).upper()
+    if not data["boss_intent"].get("banter") or str(data["boss_intent"]["banter"]).strip() in ('""', "''", ""):
+        data["boss_intent"]["banter"] = ACTION_DEFAULT_BANTERS.get(boss_act, "Executing routine!")
+    else:
+        data["boss_intent"]["banter"] = str(data["boss_intent"]["banter"]).strip()[:100]
+
+    if "tactical_reasoning" in data["boss_intent"] and isinstance(data["boss_intent"]["tactical_reasoning"], str):
+        data["boss_intent"]["tactical_reasoning"] = data["boss_intent"]["tactical_reasoning"][:150]
+
+    # Ensure psych_warfare_eval exists and conforms to schema
+    if not isinstance(data.get("psych_warfare_eval"), dict):
+        data["psych_warfare_eval"] = {
+            "hero_psych_successful": False,
+            "boss_psych_successful": False,
+            "reasoning": "No psych warfare exploit triggered.",
+        }
+    else:
         if "reasoning" in data["psych_warfare_eval"] and isinstance(data["psych_warfare_eval"]["reasoning"], str):
             data["psych_warfare_eval"]["reasoning"] = data["psych_warfare_eval"]["reasoning"][:120]
 
-    if "referee_summary" in data and isinstance(data["referee_summary"], str):
+    if not data.get("referee_summary") or not isinstance(data.get("referee_summary"), str):
+        data["referee_summary"] = f"Round {expected_round} resolved."
+    else:
         data["referee_summary"] = data["referee_summary"][:160]
 
     # Validate with Pydantic

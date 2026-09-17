@@ -429,18 +429,61 @@ body {
   border: 1px solid var(--border-gold-subtle);
 }
 
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.import-btn.wax-seal {
+  font-size: 12px;
+  padding: 6px 14px;
+}
+
+.deck-control-row,
+.difficulty-chips,
 .preset-chips {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 22px;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: nowrap;
 }
 
+.control-row-label,
 .preset-label {
   font-family: var(--font-heading);
   font-size: 13px;
+  font-weight: 700;
   color: var(--text-dim);
+  width: 125px;
+  min-width: 125px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.btn-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.btn-group .chip-btn,
+.difficulty-chips .difficulty-btn,
+.preset-chips .wax-seal {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.difficulty-btn.active {
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold-primary) 100%);
+  color: #1a120b;
+  box-shadow: 0 0 14px var(--gold-glow);
+  border-color: #fff;
 }
 
 .chip-btn {
@@ -1838,14 +1881,32 @@ body {
     width: 100%;
   }
 
-  .preset-chips {
-    gap: 6px;
-    margin-bottom: 16px;
+  .panel-header-actions {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 8px;
   }
 
+  .deck-control-row,
+  .difficulty-chips,
+  .preset-chips {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .control-row-label,
   .preset-label {
     width: 100%;
     margin-bottom: 2px;
+  }
+
+  .btn-group {
+    width: 100%;
+    display: flex;
+    gap: 6px;
   }
 
   .chip-btn {

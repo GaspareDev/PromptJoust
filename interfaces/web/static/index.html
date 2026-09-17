@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PromptJoust: The Grand Tournament</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;800;900&family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=MedievalSharp&display=swap" rel="stylesheet">
@@ -81,20 +81,35 @@
       <section class="panel hero-panel">
         <div class="panel-header">
           <h2>🛡️ CHAMPION'S CODEX & ARMS</h2>
-          <div class="points-budget">
-            VALOR POOL: <span id="remaining-points">0</span> / 20 PTS
+          <div class="panel-header-actions">
+            <input type="file" id="replay-file-input" accept=".json" style="display:none;">
+            <button type="button" id="import-replay-btn" class="chip-btn import-btn wax-seal" onclick="document.getElementById('replay-file-input').click()" title="Load external match replay JSON">📜 Import Replay</button>
+            <div class="points-budget">
+              VALOR POOL: <span id="remaining-points">0</span> / <span id="max-valor-pool">20</span> PTS
+            </div>
           </div>
         </div>
 
-        <!-- Build Presets & Import Replay with Wax Seals -->
-        <div class="preset-chips">
-          <span class="preset-label">Heraldic Seals:</span>
-          <button type="button" class="chip-btn wax-seal" onclick="applyPreset(5,5,5,5)">⚖️ Balanced</button>
-          <button type="button" class="chip-btn wax-seal" onclick="applyPreset(0,15,0,5)">🗡️ Glass Cannon</button>
-          <button type="button" class="chip-btn wax-seal" onclick="applyPreset(10,0,10,0)">🛡️ Juggernaut</button>
-          <input type="file" id="replay-file-input" accept=".json" style="display:none;">
-          <button type="button" class="chip-btn import-btn wax-seal" onclick="document.getElementById('replay-file-input').click()">📜 Import Replay</button>
+        <!-- Tournament Difficulty Selector -->
+        <div class="deck-control-row difficulty-chips">
+          <span class="control-row-label preset-label">Difficulty:</span>
+          <div class="btn-group difficulty-group">
+            <button type="button" class="chip-btn difficulty-btn" data-diff="apprentice" onclick="selectDifficulty('apprentice')">🌱 Apprentice (25 pts)</button>
+            <button type="button" class="chip-btn difficulty-btn active" data-diff="warrior" onclick="selectDifficulty('warrior')">⚔️ Warrior (20 pts)</button>
+            <button type="button" class="chip-btn difficulty-btn" data-diff="grandmaster" onclick="selectDifficulty('grandmaster')">💀 Grandmaster (15 pts)</button>
+          </div>
         </div>
+
+        <!-- Build Presets (Heraldic Seals) -->
+        <div class="deck-control-row preset-chips">
+          <span class="control-row-label preset-label">Heraldic Seals:</span>
+          <div class="btn-group preset-group">
+            <button type="button" class="chip-btn wax-seal" onclick="applyPreset(5,5,5,5)">⚖️ Balanced</button>
+            <button type="button" class="chip-btn wax-seal" onclick="applyPreset(0,15,0,5)">🗡️ Glass Cannon</button>
+            <button type="button" class="chip-btn wax-seal" onclick="applyPreset(10,0,10,0)">🛡️ Juggernaut</button>
+          </div>
+        </div>
+
 
         <!-- Stat Allocation Sliders with Graduated Ticks -->
         <div class="allocator-container">
@@ -135,7 +150,7 @@
         <!-- Tactical Scroll Directive -->
         <div class="prompt-box">
           <div class="prompt-header">
-            <label for="tactical-prompt">📜 BATTLE DIRECTIVE SCROLL (MAX 280 RUNES):</label>
+            <label for="tactical-prompt">📜 BATTLE DIRECTIVE SCROLL (MAX <span id="prompt-limit-text">280</span> RUNES):</label>
             <div class="prompt-actions">
               <button type="button" id="suggest-prompt-btn" class="chip-btn">🔮 Divinate Strategy</button>
               <span id="char-counter" class="char-ok">0 / 280</span>
@@ -143,6 +158,7 @@
           </div>
           <textarea id="tactical-prompt" class="rpg-textarea" placeholder="Inscribe combat orders for your champion (e.g. 'Strike with swift blade thrusts if the foe guards. Taunt with NullPointer curses to fracture its mind.')..."></textarea>
         </div>
+
 
         <button id="start-joust-btn" class="rpg-button gold-button">
           ⚔️ COMMENCE THE GRAND JOUST (10 ROUNDS)
@@ -277,10 +293,12 @@
           <h2 id="decree-title" class="decree-title">ROYAL VICTORY</h2>
           <p id="decree-verdict" class="decree-verdict"></p>
           <div class="decree-summary-grid">
+            <div class="decree-stat"><span>DIFFICULTY</span><b id="decree-difficulty">WARRIOR</b></div>
             <div class="decree-stat"><span>ROUNDS FOUGHT</span><b id="decree-rounds">10</b></div>
             <div class="decree-stat"><span>HERO HEALTH</span><b id="decree-hero-hp">100 HP</b></div>
             <div class="decree-stat"><span>FOE HEALTH</span><b id="decree-boss-hp">0 HP</b></div>
           </div>
+
         </div>
         <div class="decree-actions">
           <button type="button" class="rpg-button gold-button decree-btn" id="close-decree-btn">⚔️ REPLAY / VIEW ROUNDS</button>
@@ -292,7 +310,7 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.2"></script>
 </body>
 </html>
 

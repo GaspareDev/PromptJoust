@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 from typing import Tuple, List, Optional
-from .types import (
+from models import (
     ActionType,
     StatusEffect,
     FighterState,
@@ -41,9 +41,9 @@ STAMINA_RECOVERY_PER_ROUND = 5
 def calculate_base_damage(atk: int, def_: int) -> int:
     """
     Calculates raw unmitigated damage between an attacker and defender.
-    Formula: max(5, atk - def_) ensuring a minimum floor of 5 damage.
+    Formula: max(10, math.ceil(atk * 1.2 - def_ * 0.5)) ensuring a dynamic damage floor.
     """
-    return max(5, atk - def_)
+    return max(10, math.ceil(atk * 1.2 - def_ * 0.5))
 
 
 def resolve_round_actions(
@@ -112,14 +112,14 @@ def resolve_round_actions(
 
     # 2. ATTACK vs DEFEND
     elif hero_action == ActionType.ATTACK and boss_action == ActionType.DEFEND:
-        hero_damage_dealt = max(3, math.ceil(hero_raw_base * 0.40 * boss_vuln))
+        hero_damage_dealt = max(4, math.ceil(hero_raw_base * 0.35 * boss_vuln))
         boss_damage_dealt = 0
         boss_sta_recovered = 10
         boss_notes = "Defended attack: gained +10 STA"
         events.append(f"{boss_state.name} blocks {hero_state.name}'s strike! Damage reduced to {hero_damage_dealt} and recovers +10 STA.")
 
     elif hero_action == ActionType.DEFEND and boss_action == ActionType.ATTACK:
-        boss_damage_dealt = max(1, math.ceil(boss_raw_base * 0.25 * hero_vuln))
+        boss_damage_dealt = max(4, math.ceil(boss_raw_base * 0.25 * hero_vuln))
         hero_damage_dealt = 0
         hero_sta_recovered = 10
         hero_notes = "Defended attack: gained +10 STA"
@@ -127,14 +127,14 @@ def resolve_round_actions(
 
     # 3. HEAVY_ATTACK vs DEFEND (Guard Break)
     elif hero_action == ActionType.HEAVY_ATTACK and boss_action == ActionType.DEFEND:
-        hero_damage_dealt = math.ceil(hero_state.atk * 1.2 * boss_vuln)
+        hero_damage_dealt = math.ceil(hero_state.atk * 1.5 * boss_vuln)
         boss_damage_dealt = 0
         hero_inflicted_status = StatusEffect.STAGGERED
         hero_notes = "GUARD BREAK! Inflicted STAGGERED"
         events.append(f"GUARD BREAK! {hero_state.name}'s Heavy Attack shatters {boss_state.name}'s guard for {hero_damage_dealt} dmg! {boss_state.name} is STAGGERED!")
 
     elif hero_action == ActionType.DEFEND and boss_action == ActionType.HEAVY_ATTACK:
-        boss_damage_dealt = math.ceil(boss_state.atk * 1.2 * hero_vuln)
+        boss_damage_dealt = math.ceil(boss_state.atk * 1.5 * hero_vuln)
         hero_damage_dealt = 0
         boss_inflicted_status = StatusEffect.STAGGERED
         boss_notes = "GUARD BREAK! Inflicted STAGGERED"
@@ -143,15 +143,15 @@ def resolve_round_actions(
     # 4. HEAVY_ATTACK vs DODGE (Elusion + Counter-Attack)
     elif hero_action == ActionType.HEAVY_ATTACK and boss_action == ActionType.DODGE:
         hero_damage_dealt = 0
-        boss_damage_dealt = 20  # Deterministic counter
-        boss_notes = "Dodged Heavy Attack! Countered for 20 dmg"
-        events.append(f"{boss_state.name} dodges {hero_state.name}'s heavy windup completely and executes a counter-thrust for 20 dmg!")
+        boss_damage_dealt = 25  # Deterministic counter
+        boss_notes = "Dodged Heavy Attack! Countered for 25 dmg"
+        events.append(f"{boss_state.name} dodges {hero_state.name}'s heavy windup completely and executes a counter-thrust for 25 dmg!")
 
     elif hero_action == ActionType.DODGE and boss_action == ActionType.HEAVY_ATTACK:
         boss_damage_dealt = 0
-        hero_damage_dealt = 20  # Deterministic counter
-        hero_notes = "Dodged Heavy Attack! Countered for 20 dmg"
-        events.append(f"{hero_state.name} dodges {boss_state.name}'s heavy windup completely and executes a counter-thrust for 20 dmg!")
+        hero_damage_dealt = 25  # Deterministic counter
+        hero_notes = "Dodged Heavy Attack! Countered for 25 dmg"
+        events.append(f"{hero_state.name} dodges {boss_state.name}'s heavy windup completely and executes a counter-thrust for 25 dmg!")
 
     # 5. ATTACK vs DODGE (Dodge fails on quick attack)
     elif hero_action == ActionType.ATTACK and boss_action == ActionType.DODGE:
@@ -166,19 +166,19 @@ def resolve_round_actions(
 
     # 6. HEAVY_ATTACK vs HEAVY_ATTACK
     elif hero_action == ActionType.HEAVY_ATTACK and boss_action == ActionType.HEAVY_ATTACK:
-        hero_damage_dealt = math.ceil(hero_state.atk * 1.8 * boss_vuln)
-        boss_damage_dealt = math.ceil(boss_state.atk * 1.8 * hero_vuln)
+        hero_damage_dealt = math.ceil(hero_state.atk * 2.0 * boss_vuln)
+        boss_damage_dealt = math.ceil(boss_state.atk * 2.0 * hero_vuln)
         events.append(f"Titanic Collision! Both unleash Heavy Attacks simultaneously! {hero_state.name} deals {hero_damage_dealt}, {boss_state.name} deals {boss_damage_dealt}.")
 
     # 7. HEAVY_ATTACK vs ATTACK
     elif hero_action == ActionType.HEAVY_ATTACK and boss_action == ActionType.ATTACK:
-        hero_damage_dealt = math.ceil(hero_state.atk * 1.8 * boss_vuln)
+        hero_damage_dealt = math.ceil(hero_state.atk * 1.6 * boss_vuln)
         boss_damage_dealt = math.ceil(boss_raw_base * hero_vuln)
         events.append(f"{hero_state.name} powers through with a crushing Heavy Attack ({hero_damage_dealt} dmg) while taking a swift blow ({boss_damage_dealt} dmg).")
 
     elif hero_action == ActionType.ATTACK and boss_action == ActionType.HEAVY_ATTACK:
         hero_damage_dealt = math.ceil(hero_raw_base * boss_vuln)
-        boss_damage_dealt = math.ceil(boss_state.atk * 1.8 * hero_vuln)
+        boss_damage_dealt = math.ceil(boss_state.atk * 1.6 * hero_vuln)
         events.append(f"{boss_state.name} powers through with a crushing Heavy Attack ({boss_damage_dealt} dmg) while taking a swift blow ({hero_damage_dealt} dmg).")
 
     # 8. DEFEND vs DEFEND
@@ -209,7 +209,7 @@ def resolve_round_actions(
             boss_damage_dealt = math.ceil(boss_raw_base * hero_vuln)
             events.append(f"{boss_state.name} punishes {hero_state.name}'s mind games with a direct strike for {boss_damage_dealt} dmg.")
         elif boss_action == ActionType.HEAVY_ATTACK:
-            boss_damage_dealt = math.ceil(boss_state.atk * 1.8 * hero_vuln)
+            boss_damage_dealt = math.ceil(boss_state.atk * 1.6 * hero_vuln)
             events.append(f"{boss_state.name} retaliates against the taunt with a devastating Heavy Strike for {boss_damage_dealt} dmg!")
 
     if boss_action == ActionType.PSYCH_WARFARE:
@@ -224,7 +224,7 @@ def resolve_round_actions(
             hero_damage_dealt = math.ceil(hero_raw_base * boss_vuln)
             events.append(f"{hero_state.name} punishes {boss_state.name}'s mind games with a direct strike for {hero_damage_dealt} dmg.")
         elif hero_action == ActionType.HEAVY_ATTACK:
-            hero_damage_dealt = math.ceil(hero_state.atk * 1.8 * boss_vuln)
+            hero_damage_dealt = math.ceil(hero_state.atk * 1.6 * boss_vuln)
             events.append(f"{hero_state.name} retaliates against the taunt with a devastating Heavy Strike for {hero_damage_dealt} dmg!")
 
     # 12. CONFUSED Actions
@@ -235,7 +235,7 @@ def resolve_round_actions(
             boss_damage_dealt = math.ceil(boss_raw_base * hero_vuln)
             events.append(f"{boss_state.name} exploits {hero_state.name}'s confusion with a direct strike for {boss_damage_dealt} dmg.")
         elif boss_action == ActionType.HEAVY_ATTACK:
-            boss_damage_dealt = math.ceil(boss_state.atk * 1.8 * hero_vuln)
+            boss_damage_dealt = math.ceil(boss_state.atk * 1.6 * hero_vuln)
             events.append(f"{boss_state.name} punishes {hero_state.name}'s confusion with a crushing Heavy Attack for {boss_damage_dealt} dmg!")
 
     elif boss_action == ActionType.CONFUSED and hero_action != ActionType.CONFUSED:
@@ -245,7 +245,7 @@ def resolve_round_actions(
             hero_damage_dealt = math.ceil(hero_raw_base * boss_vuln)
             events.append(f"{hero_state.name} exploits {boss_state.name}'s confusion with a direct strike for {hero_damage_dealt} dmg.")
         elif hero_action == ActionType.HEAVY_ATTACK:
-            hero_damage_dealt = math.ceil(hero_state.atk * 1.8 * boss_vuln)
+            hero_damage_dealt = math.ceil(hero_state.atk * 1.6 * boss_vuln)
             events.append(f"{hero_state.name} punishes {boss_state.name}'s confusion with a crushing Heavy Attack for {hero_damage_dealt} dmg!")
 
     elif hero_action == ActionType.CONFUSED and boss_action == ActionType.CONFUSED:

@@ -12,7 +12,9 @@ from core.types import (
     HeroIntent,
     BossIntent,
     PsychWarfareEval,
+    DifficultyLevel,
 )
+
 from core.engine import MatchEngine, align_fighter_intents
 from core.sanitizer import (
     validate_and_allocate_stats,
@@ -457,6 +459,297 @@ def test_hero_status_duration_decay():
     engine._execute_round(2)
     assert engine.hero_state.status == StatusEffect.NORMAL
     assert engine.hero_state.status_duration == 0
+
+
+def test_engine_difficulty_scaling():
+    boss = dummy_boss(hp=100, atk=20, def_=10, sta=50)
+
+    # 1. Apprentice scaling (-15% HP & ATK)
+    hero_stats_app = validate_and_allocate_stats(hp_bonus=10, atk_bonus=5, def_bonus=5, sta_bonus=5, difficulty=DifficultyLevel.APPRENTICE)
+    engine_app = MatchEngine(
+        hero_name="HeroApprentice",
+        hero_stats=hero_stats_app,
+        hero_prompt="Swift strike.",
+        boss=boss,
+        provider=MockProvider(),
+        difficulty=DifficultyLevel.APPRENTICE,
+    )
+    assert engine_app.boss_state.max_hp == 85  # ceil(100 * 0.85)
+    assert engine_app.boss_state.atk == 17     # ceil(20 * 0.85)
+    res_app = engine_app.run_match()
+    assert res_app.difficulty == DifficultyLevel.APPRENTICE
+
+    # 2. Grandmaster scaling (+20% HP/ATK, +10% DEF, 8 STA recovery)
+    hero_stats_gm = validate_and_allocate_stats(hp_bonus=5, atk_bonus=5, def_bonus=5, sta_bonus=0, difficulty=DifficultyLevel.GRANDMASTER)
+    engine_gm = MatchEngine(
+        hero_name="HeroGM",
+        hero_stats=hero_stats_gm,
+        hero_prompt="Concise order.",
+        boss=boss,
+        provider=MockProvider(),
+        difficulty=DifficultyLevel.GRANDMASTER,
+    )
+    assert engine_gm.boss_state.max_hp == 120  # ceil(100 * 1.20)
+    assert engine_gm.boss_state.atk == 24     # ceil(20 * 1.20)
+    assert engine_gm.boss_state.def_ == 11    # ceil(10 * 1.10)
+    assert engine_gm.boss_stamina_recovery == 8
+    res_gm = engine_gm.run_match()
+    assert res_gm.difficulty == DifficultyLevel.GRANDMASTER
+
+
+def test_engine_run_match_async_and_stream():
+    import asyncio
+
+    hero_stats = FighterStats(hp=100, atk=25, def_=10, sta=50)
+    boss = dummy_boss(hp=50, atk=10, def_=5, sta=40)
+
+    class AsyncMockProvider:
+        async def generate_turn_decision_async(self, system_prompt, user_prompt, schema):
+            return TurnDecision(
+                round_number=1,
+                hero_intent=HeroIntent(action=ActionType.ATTACK, banter="Swift strike!", tactical_reasoning="atk"),
+                boss_intent=BossIntent(action=ActionType.DEFEND, banter="Block!", tactical_reasoning="def"),
+                psych_warfare_eval=PsychWarfareEval(hero_psych_successful=False, boss_psych_successful=False, reasoning="none"),
+                referee_summary="Hero attacks, Boss defends",
+            )
+
+    pre_rounds = []
+    post_rounds = []
+
+    engine = MatchEngine(
+        hero_name="AsyncHero",
+        hero_stats=hero_stats,
+        hero_prompt="Strike swiftly.",
+        boss=boss,
+        provider=AsyncMockProvider(),
+        pre_round_callback=lambda r: pre_rounds.append(r),
+        round_callback=lambda log: post_rounds.append(log.round_number),
+    )
+
+    result = asyncio.run(engine.run_match_async())
+    assert result.winner == "Hero"
+    assert len(pre_rounds) > 0
+    assert len(post_rounds) > 0
+
+    # Stream test
+    engine2 = MatchEngine(
+        hero_name="StreamHero",
+        hero_stats=hero_stats,
+        hero_prompt="Strike swiftly.",
+        boss=boss,
+        provider=AsyncMockProvider(),
+    )
+
+    async def collect_stream():
+        events = []
+        async for item in engine2.stream_match():
+            events.append(item)
+        return events
+
+    stream_events = asyncio.run(collect_stream())
+    assert stream_events[0]["event"] == "init"
+    assert "hero_state" in stream_events[0]["data"]
+    assert any(e["event"] == "round" for e in stream_events)
+    assert stream_events[-1]["event"] == "complete"
+    assert stream_events[-1]["data"]["winner"] == "Hero"
+
+
+def test_engine_async_error_and_sync_provider_fallbacks():
+    import asyncio
+
+    hero_stats = FighterStats(hp=100, atk=15, def_=10, sta=50)
+    boss = dummy_boss(hp=100, atk=10, def_=10, sta=50)
+
+    # Provider that only has sync generate_turn_decision
+    class SyncOnlyProvider:
+        def generate_turn_decision(self, system_prompt, user_prompt, schema):
+            return TurnDecision(
+                round_number=1,
+                hero_intent=HeroIntent(action=ActionType.ATTACK, banter="Sync!", tactical_reasoning=""),
+                boss_intent=BossIntent(action=ActionType.DEFEND, banter="SyncDef!", tactical_reasoning=""),
+                psych_warfare_eval=PsychWarfareEval(hero_psych_successful=False, boss_psych_successful=False, reasoning=""),
+                referee_summary="Sync decision",
+            )
+
+    engine_sync = MatchEngine(
+        hero_name="SyncHero",
+        hero_stats=hero_stats,
+        hero_prompt="Attack",
+        boss=boss,
+        provider=SyncOnlyProvider(),
+        max_rounds=1,
+    )
+    res_sync = asyncio.run(engine_sync.run_match_async())
+    assert len(res_sync.rounds_log) == 1
+
+    # Provider that errors out asynchronously
+    class ErrorAsyncProvider:
+        async def generate_turn_decision_async(self, system_prompt, user_prompt, schema):
+            raise RuntimeError("Async model crash!")
+
+    engine_err = MatchEngine(
+        hero_name="ErrHero",
+        hero_stats=hero_stats,
+        hero_prompt="Attack",
+        boss=boss,
+        provider=ErrorAsyncProvider(),
+        max_rounds=1,
+    )
+    res_err = asyncio.run(engine_err.run_match_async())
+    assert "arbitration error" in res_err.rounds_log[0].turn_decision.hero_intent.tactical_reasoning
+
+
+def test_engine_stream_match_dead_fighters_pre_loop():
+    import asyncio
+
+    hero_stats = FighterStats(hp=100, atk=15, def_=10, sta=50)
+    boss = dummy_boss(hp=100, atk=10, def_=10, sta=50)
+
+    class DummyP:
+        pass
+
+    engine = MatchEngine(hero_name="Hero", hero_stats=hero_stats, hero_prompt="atk", boss=boss, provider=DummyP())
+    engine.hero_state.current_hp = 0
+
+    async def collect():
+        return [item async for item in engine.stream_match()]
+
+    events = asyncio.run(collect())
+    assert len(events) == 2
+    assert events[0]["event"] == "init"
+    assert events[1]["event"] == "complete"
+
+
+def test_engine_run_match_async_dead_fighter_pre_loop():
+    import asyncio
+
+    hero_stats = FighterStats(hp=100, atk=15, def_=10, sta=50)
+    boss = dummy_boss(hp=100, atk=10, def_=10, sta=50)
+
+    class DummyP:
+        pass
+
+    engine = MatchEngine(hero_name="Hero", hero_stats=hero_stats, hero_prompt="atk", boss=boss, provider=DummyP())
+    engine.hero_state.current_hp = 0
+
+    res = asyncio.run(engine.run_match_async())
+    assert len(res.rounds_log) == 0
+    assert res.winner == "Boss"
+
+
+def test_engine_stream_match_with_callbacks_and_raw_json_provider():
+    import asyncio
+    import json
+
+    pre_rounds = []
+    logged_rounds = []
+
+    def on_pre(r):
+        pre_rounds.append(r)
+
+    def on_round(log):
+        logged_rounds.append(log.round_number)
+
+    class RawJsonAsyncProvider:
+        async def generate_turn_decision_async(self, system_prompt, user_prompt, schema):
+            return json.dumps({
+                "round_number": 1,
+                "hero_intent": {
+                    "action": "ATTACK",
+                    "banter": "Take this!",
+                    "tactical_reasoning": "Basic attack"
+                },
+                "boss_intent": {
+                    "action": "DEFEND",
+                    "banter": "Shields up!",
+                    "tactical_reasoning": "Blocking"
+                },
+                "psych_warfare_eval": {
+                    "hero_psych_successful": False,
+                    "boss_psych_successful": False,
+                    "reasoning": "Neutral"
+                },
+                "referee_summary": "Hero strikes boss shield."
+            })
+
+    hero_stats = FighterStats(hp=100, atk=15, def_=10, sta=50)
+    boss = dummy_boss(hp=100, atk=10, def_=10, sta=50)
+
+    engine = MatchEngine(
+        hero_name="Hero",
+        hero_stats=hero_stats,
+        hero_prompt="atk",
+        boss=boss,
+        provider=RawJsonAsyncProvider(),
+        pre_round_callback=on_pre,
+        round_callback=on_round,
+        max_rounds=1,
+    )
+
+    async def collect():
+        return [item async for item in engine.stream_match()]
+
+    events = asyncio.run(collect())
+    assert len(events) == 3
+    assert events[0]["event"] == "init"
+    assert events[1]["event"] == "round"
+    assert events[2]["event"] == "complete"
+    assert pre_rounds == [1]
+    assert logged_rounds == [1]
+
+
+def test_empty_tactical_prompt_hero_confused_and_loses():
+    # When user leaves tactical directive blank, hero enters match aimless and confused every turn
+    hero_stats = FighterStats(hp=60, atk=20, def_=10, sta=50)
+    boss = dummy_boss(hp=100, atk=25, def_=12, sta=50)
+
+    engine = MatchEngine(
+        hero_name="Clueless Fighter",
+        hero_stats=hero_stats,
+        hero_prompt="",  # Empty tactical directive
+        boss=boss,
+        provider=MockProvider(),
+        max_rounds=5,
+    )
+
+    result = engine.run_match()
+    assert result.total_rounds > 0
+    # Hero is confused on all rounds
+    for r in result.rounds_log:
+        assert r.turn_decision.hero_intent.action == ActionType.CONFUSED
+        assert "No orders received" in r.turn_decision.hero_intent.banter
+        assert r.hero_resolution.damage_dealt == 0
+    # Boss wins because hero never attacks
+    assert result.winner == "Boss"
+
+
+def test_empty_tactical_prompt_async_stream():
+    import asyncio
+    hero_stats = FighterStats(hp=60, atk=20, def_=10, sta=50)
+    boss = dummy_boss(hp=100, atk=25, def_=12, sta=50)
+
+    engine = MatchEngine(
+        hero_name="Aimless Fighter",
+        hero_stats=hero_stats,
+        hero_prompt="   ",  # Whitespace only
+        boss=boss,
+        provider=MockProvider(),
+        max_rounds=2,
+    )
+
+    async def collect():
+        return [item async for item in engine.stream_match()]
+
+    events = asyncio.run(collect())
+    round_events = [e for e in events if e["event"] == "round"]
+    assert len(round_events) > 0
+    for rev in round_events:
+        assert rev["data"]["turn_decision"]["hero_intent"]["action"] == "CONFUSED"
+        assert "No orders received" in rev["data"]["turn_decision"]["hero_intent"]["banter"]
+
+
+
+
 
 
 

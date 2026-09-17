@@ -316,6 +316,13 @@ def test_referee_unparseable_errors():
     with pytest.raises(ValueError, match="Failed to parse JSON"):
         parse_and_validate_turn_decision("Some text { corrupted json: invalid } end text", expected_round=1)
 
+    # 3. Truncated JSON repaired successfully
+    truncated = '{"round_number": 1, "referee_summary": "ok"'
+    d_repaired = parse_and_validate_turn_decision(truncated, expected_round=1)
+    assert d_repaired.round_number == 1
+    assert d_repaired.hero_intent.action == ActionType.ATTACK
+    assert d_repaired.boss_intent.action == ActionType.DEFEND
+
 
 def test_sanitizer_stat_bounds_errors():
     from core.sanitizer import validate_and_allocate_stats, SanitizationError
@@ -331,6 +338,173 @@ def test_dummy_provider_fallback_regexes():
     d1 = dummy_p.generate_turn_decision("sys", "Raw instruction string with schede perforate", REFEREE_JSON_SCHEMA)
     assert d1.round_number == 1
     assert d1.hero_intent.action == ActionType.ATTACK
+
+
+def test_gemini_provider_async_sdk_and_rest():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    # 1. Async SDK path
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.text = SAMPLE_DECISION_JSON
+        mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+        provider = GeminiProvider(api_key="fake-gemini-key")
+        result = asyncio.run(provider.generate_turn_decision_async(
+            system_prompt="sys",
+            user_prompt="usr",
+            schema=REFEREE_JSON_SCHEMA,
+        ))
+        assert result == SAMPLE_DECISION_JSON
+
+    # 2. Async REST fallback path
+    with patch.dict("sys.modules", {"google.genai": None, "google": None}):
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "candidates": [
+                    {"content": {"parts": [{"text": SAMPLE_DECISION_JSON}]}}
+                ]
+            }
+            mock_resp.raise_for_status.return_value = None
+            mock_post.return_value = mock_resp
+
+            provider = GeminiProvider(api_key="fake-gemini-key")
+            result = asyncio.run(provider.generate_turn_decision_async(
+                system_prompt="sys",
+                user_prompt="usr",
+                schema=REFEREE_JSON_SCHEMA,
+            ))
+            assert result == SAMPLE_DECISION_JSON
+
+
+def test_claude_provider_async_sdk_and_rest():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    # 1a. Async SDK path with object content
+    mock_anthropic = MagicMock()
+    mock_async_client = MagicMock()
+    mock_anthropic.AsyncAnthropic.return_value = mock_async_client
+    mock_resp = MagicMock()
+    mock_part = MagicMock()
+    mock_part.text = SAMPLE_DECISION_JSON
+    mock_resp.content = [mock_part]
+    mock_async_client.messages.create = AsyncMock(return_value=mock_resp)
+
+    with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+        provider = ClaudeProvider(api_key="fake-claude-key")
+        result = asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+        assert result == SAMPLE_DECISION_JSON
+
+    # 1b. Async SDK path with dict content
+    mock_resp_dict = MagicMock()
+    mock_resp_dict.content = [{"text": SAMPLE_DECISION_JSON}]
+    mock_async_client.messages.create = AsyncMock(return_value=mock_resp_dict)
+    with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+        provider = ClaudeProvider(api_key="fake-claude-key")
+        result = asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+        assert result == SAMPLE_DECISION_JSON
+
+    # 1c. Async SDK path error falls back to REST
+    mock_async_client.messages.create = AsyncMock(side_effect=RuntimeError("SDK failure"))
+    with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {"content": [{"text": SAMPLE_DECISION_JSON}]}
+            mock_resp.raise_for_status.return_value = None
+            mock_post.return_value = mock_resp
+
+            provider = ClaudeProvider(api_key="fake-claude-key")
+            result = asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+            assert result == SAMPLE_DECISION_JSON
+
+    # 2. Async REST fallback path
+    provider = ClaudeProvider(api_key="fake-claude-key")
+    provider._async_client = None
+    with patch("httpx.AsyncClient.post") as mock_post:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"content": [{"text": SAMPLE_DECISION_JSON}]}
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        result = asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+        assert result == SAMPLE_DECISION_JSON
+
+    # 3. Async REST invalid format error
+    with patch("httpx.AsyncClient.post") as mock_post:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"error": "bad request"}
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        with pytest.raises(ValueError, match="Unexpected response structure"):
+            asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+
+    # 4. Async REST connection error
+    with patch("httpx.AsyncClient.post", side_effect=Exception("Network down")):
+        with pytest.raises(ConnectionError, match="Claude API request failed"):
+            asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+
+
+def test_openai_provider_async_success():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    with patch("openai.OpenAI"), patch("openai.AsyncOpenAI") as mock_async_openai:
+        mock_async_client = MagicMock()
+        mock_async_openai.return_value = mock_async_client
+        mock_resp = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = SAMPLE_DECISION_JSON
+        mock_resp.choices = [mock_choice]
+        mock_async_client.chat.completions.create = AsyncMock(return_value=mock_resp)
+
+        provider = OpenAIProvider(api_key="fake-openai-key")
+        result = asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+        assert result == SAMPLE_DECISION_JSON
+
+
+def test_groq_provider_async_success():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    with patch("groq.Groq"), patch("groq.AsyncGroq") as mock_async_groq:
+        mock_async_client = MagicMock()
+        mock_async_groq.return_value = mock_async_client
+        mock_resp = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = SAMPLE_DECISION_JSON
+        mock_resp.choices = [mock_choice]
+        mock_async_client.chat.completions.create = AsyncMock(return_value=mock_resp)
+
+        provider = GroqProvider(api_key="fake-groq-key")
+        result = asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+        assert result == SAMPLE_DECISION_JSON
+
+
+def test_ollama_provider_async_success_and_error():
+    import asyncio
+
+    # Success
+    with patch("httpx.AsyncClient.post") as mock_post:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"message": {"content": SAMPLE_DECISION_JSON}}
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        provider = OllamaProvider(host="http://localhost:11434", model="llama3")
+        result = asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
+        assert result == SAMPLE_DECISION_JSON
+
+    # Error
+    with patch("httpx.AsyncClient.post", side_effect=Exception("Connection refused")):
+        provider = OllamaProvider(host="http://localhost:11434", model="llama3")
+        with pytest.raises(ConnectionError, match="Failed to communicate with local Ollama server"):
+            asyncio.run(provider.generate_turn_decision_async("sys", "usr", REFEREE_JSON_SCHEMA))
 
 
 

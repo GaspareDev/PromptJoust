@@ -11,6 +11,7 @@ FastAPI application providing:
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -21,11 +22,18 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 
-from core.types import BossData, MatchResult, FighterStats
+from models import (
+    BossData,
+    MatchResult,
+    FighterStats,
+    DifficultyLevel,
+    DIFFICULTY_CONFIGS,
+    SimulationRequest,
+)
 from core.config import settings
 from core.sanitizer import (
     validate_and_allocate_stats,
@@ -36,6 +44,7 @@ from core.sanitizer import (
 )
 from core.engine import MatchEngine
 from providers import get_provider, PROVIDERS
+
 
 app = FastAPI(
     title="PromptJoust API",
@@ -71,19 +80,6 @@ def load_bosses() -> Dict[str, BossData]:
     return bosses
 
 
-class SimulationRequest(BaseModel):
-    boss_id: str
-    hero_name: str = "Tactician Prime"
-    tactical_prompt: str
-    hp_bonus: int = Field(default=5, ge=0, le=20)
-    atk_bonus: int = Field(default=5, ge=0, le=20)
-    def_bonus: int = Field(default=5, ge=0, le=20)
-    sta_bonus: int = Field(default=5, ge=0, le=20)
-    provider: str = "ollama"
-    api_key: Optional[str] = None
-    model: Optional[str] = None
-
-
 @app.get("/api/bosses")
 def get_bosses():
     """
@@ -112,16 +108,24 @@ def get_providers():
     return list(PROVIDERS.keys())
 
 
+@app.get("/api/difficulties")
+def get_difficulties():
+    """
+    Returns metadata and combat modifiers for all difficulty tiers.
+    """
+    return [cfg.model_dump() for cfg in DIFFICULTY_CONFIGS.values()]
+
+
 @app.post("/api/simulate", response_model=MatchResult)
-def simulate_match(req: SimulationRequest):
+async def simulate_match(req: SimulationRequest):
     """
     Executes a complete 10-round combat simulation against the selected Boss.
 
     1. Validates boss existence.
-    2. Validates and allocates stat bonuses (must equal 20 points).
-    3. Sanitizes user tactical prompt.
+    2. Validates and allocates stat bonuses according to chosen difficulty.
+    3. Sanitizes user tactical prompt enforcing character limits.
     4. Initializes requested LLM provider (or defaults to environment config).
-    5. Runs MatchEngine loop and returns full RoundLog & MatchResult.
+    5. Runs MatchEngine loop with scaled boss stats and returns full RoundLog & MatchResult.
     """
     bosses = load_bosses()
     if req.boss_id not in bosses:
@@ -135,12 +139,13 @@ def simulate_match(req: SimulationRequest):
             atk_bonus=req.atk_bonus,
             def_bonus=req.def_bonus,
             sta_bonus=req.sta_bonus,
+            difficulty=req.difficulty,
         )
     except SanitizationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        clean_prompt = sanitize_tactical_prompt(req.tactical_prompt)
+        clean_prompt = sanitize_tactical_prompt(req.tactical_prompt, difficulty=req.difficulty, allow_empty=True)
     except SanitizationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -159,10 +164,71 @@ def simulate_match(req: SimulationRequest):
         hero_prompt=clean_prompt,
         boss=boss,
         provider=provider,
+        difficulty=req.difficulty,
     )
 
-    result = engine.run_match()
+    result = await engine.run_match_async()
     return result
+
+
+@app.post("/api/simulate/stream")
+async def simulate_match_stream(req: SimulationRequest):
+    """
+    Executes real-time turn-by-turn combat simulation streaming events via Server-Sent Events (SSE).
+
+    Emits SSE events:
+    - 'init': initial combatant stats and match configuration
+    - 'round': generated RoundLog after each turn resolves
+    - 'complete': final MatchResult upon tournament conclusion
+    """
+    bosses = load_bosses()
+    if req.boss_id not in bosses:
+        raise HTTPException(status_code=404, detail=f"Boss '{req.boss_id}' not found.")
+
+    boss = bosses[req.boss_id]
+
+    try:
+        hero_stats = validate_and_allocate_stats(
+            hp_bonus=req.hp_bonus,
+            atk_bonus=req.atk_bonus,
+            def_bonus=req.def_bonus,
+            sta_bonus=req.sta_bonus,
+            difficulty=req.difficulty,
+        )
+    except SanitizationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        clean_prompt = sanitize_tactical_prompt(req.tactical_prompt, difficulty=req.difficulty, allow_empty=True)
+    except SanitizationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        provider = get_provider(
+            provider_name=req.provider,
+            api_key=req.api_key,
+            model=req.model,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Provider initialization error: {e}")
+
+    engine = MatchEngine(
+        hero_name=req.hero_name,
+        hero_stats=hero_stats,
+        hero_prompt=clean_prompt,
+        boss=boss,
+        provider=provider,
+        difficulty=req.difficulty,
+    )
+
+    async def event_generator():
+        async for item in engine.stream_match():
+            event_name = item["event"]
+            payload = json.dumps(item["data"])
+            yield f"event: {event_name}\ndata: {payload}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
 
 
 if STATIC_DIR.exists():
@@ -175,7 +241,8 @@ def run():
     print("⚔️ PROMPT JOUST WEB ARENA")
     print(f"👉 Open in browser: http://localhost:{settings.server_port} or http://127.0.0.1:{settings.server_port}")
     print("=" * 60 + "\n")
-    uvicorn.run("interfaces.web.server:app", host=settings.server_host, port=settings.server_port, reload=False)
+    reload_env = os.getenv("RELOAD", "true" if settings.debug else "false").lower() == "true"
+    uvicorn.run("interfaces.web.server:app", host=settings.server_host, port=settings.server_port, reload=reload_env)
 
 
 if __name__ == "__main__":

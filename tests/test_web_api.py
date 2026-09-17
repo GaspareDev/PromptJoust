@@ -162,4 +162,163 @@ def test_server_module_main_and_sys_path():
                 sys.path.insert(0, root)
 
 
+def test_get_difficulties():
+    resp = client.get("/api/difficulties")
+    assert resp.status_code == 200
+    diffs = resp.json()
+    assert len(diffs) == 3
+    levels = [d["level"] for d in diffs]
+    assert "apprentice" in levels
+    assert "warrior" in levels
+    assert "grandmaster" in levels
+
+
+@patch("interfaces.web.server.get_provider")
+def test_simulate_match_apprentice_and_grandmaster(mock_get_p):
+    mock_get_p.return_value = DummyTestProvider()
+
+    # Apprentice (25 valor points)
+    payload_apprentice = {
+        "boss_id": "boss_level_01",
+        "hero_name": "NoviceHero",
+        "tactical_prompt": "Standard strike with quick blade.",
+        "hp_bonus": 10,
+        "atk_bonus": 5,
+        "def_bonus": 5,
+        "sta_bonus": 5,  # Sum is 25
+        "difficulty": "apprentice",
+        "provider": "gemini",
+    }
+    resp_app = client.post("/api/simulate", json=payload_apprentice)
+    assert resp_app.status_code == 200
+    res_app = resp_app.json()
+    assert res_app["difficulty"] == "apprentice"
+
+    # Grandmaster (15 valor points)
+    payload_grandmaster = {
+        "boss_id": "boss_level_01",
+        "hero_name": "MasterHero",
+        "tactical_prompt": "Concise attack order.",
+        "hp_bonus": 5,
+        "atk_bonus": 5,
+        "def_bonus": 5,
+        "sta_bonus": 0,  # Sum is 15
+        "difficulty": "grandmaster",
+        "provider": "gemini",
+    }
+    resp_gm = client.post("/api/simulate", json=payload_grandmaster)
+    assert resp_gm.status_code == 200
+    res_gm = resp_gm.json()
+    assert res_gm["difficulty"] == "grandmaster"
+
+
+@patch("interfaces.web.server.get_provider")
+def test_simulate_match_stream_endpoint(mock_get_p):
+    mock_get_p.return_value = DummyTestProvider()
+
+    payload = {
+        "boss_id": "boss_level_01",
+        "hero_name": "StreamChampion",
+        "tactical_prompt": "Fast slash with iron sword.",
+        "hp_bonus": 5,
+        "atk_bonus": 5,
+        "def_bonus": 5,
+        "sta_bonus": 5,
+        "difficulty": "warrior",
+        "provider": "ollama",
+    }
+    resp = client.post("/api/simulate/stream", json=payload)
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers["content-type"]
+    body = resp.text
+    assert "event: init" in body
+    assert "event: round" in body
+    assert "event: complete" in body
+
+
+def test_simulate_match_stream_validation_errors():
+    # 1. Unknown boss
+    resp = client.post("/api/simulate/stream", json={
+        "boss_id": "non_existent_boss",
+        "tactical_prompt": "Fight",
+        "hp_bonus": 5,
+        "atk_bonus": 5,
+        "def_bonus": 5,
+        "sta_bonus": 5,
+    })
+    assert resp.status_code == 404
+
+    # 2. Invalid points
+    resp = client.post("/api/simulate/stream", json={
+        "boss_id": "boss_level_01",
+        "tactical_prompt": "Fight",
+        "hp_bonus": 0,
+        "atk_bonus": 0,
+        "def_bonus": 0,
+        "sta_bonus": 0,
+    })
+    assert resp.status_code == 400
+
+    # 3. Overlength prompt
+    resp = client.post("/api/simulate/stream", json={
+        "boss_id": "boss_level_01",
+        "tactical_prompt": "A" * 300,
+        "hp_bonus": 5,
+        "atk_bonus": 5,
+        "def_bonus": 5,
+        "sta_bonus": 5,
+    })
+    assert resp.status_code == 400
+
+    # 4. Provider init error
+    with patch("interfaces.web.server.get_provider", side_effect=ValueError("Bad provider key")):
+        resp = client.post("/api/simulate/stream", json={
+            "boss_id": "boss_level_01",
+            "tactical_prompt": "Fight",
+            "hp_bonus": 5,
+            "atk_bonus": 5,
+            "def_bonus": 5,
+            "sta_bonus": 5,
+        })
+        assert resp.status_code == 400
+        assert "Provider initialization error" in resp.json()["detail"]
+
+
+def test_simulate_empty_prompt_stream_and_json():
+    # Verify empty prompt is allowed in web endpoints and hero enters confusion
+    with patch("interfaces.web.server.get_provider") as mock_get_provider:
+        mock_get_provider.return_value = DummyTestProvider()
+
+        # 1. JSON endpoint
+        resp = client.post("/api/simulate", json={
+            "boss_id": "boss_level_01",
+            "hero_name": "Silent Hero",
+            "tactical_prompt": "",
+            "hp_bonus": 5,
+            "atk_bonus": 5,
+            "def_bonus": 5,
+            "sta_bonus": 5,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["winner"] == "Boss"
+        assert data["rounds_log"][0]["turn_decision"]["hero_intent"]["action"] == "CONFUSED"
+
+        # 2. SSE Stream endpoint
+        resp_stream = client.post("/api/simulate/stream", json={
+            "boss_id": "boss_level_01",
+            "hero_name": "Silent Hero",
+            "tactical_prompt": "   ",
+            "hp_bonus": 5,
+            "atk_bonus": 5,
+            "def_bonus": 5,
+            "sta_bonus": 5,
+        })
+        assert resp_stream.status_code == 200
+        assert "CONFUSED" in resp_stream.text
+
+
+
+
+
 
